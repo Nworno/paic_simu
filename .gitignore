@@ -1,4 +1,7 @@
 .Rproj.user
+.Rprofile
+*.Rproj
 .Rhistory
 .RData
 .Ruserdata
+dev/
