@@ -293,7 +293,7 @@ propensity_score <- function(df, anchored) {
   return(estimate_AB)
 }
 
-run_propensity_score <- function(df, anchored) {
+run_propensity_score <- function(trials_combined, anchored) {
   estimate <- propensity_score(trials_combined, anchored)
   variance <- sapply(1:N_BOOT_ITER, \(x) propensity_score(trials_combined[sample(1:.N, .N, replace = TRUE), .SD, by = c("trial", "ttt")], anchored)) |> var()
   return(list("estimate" = estimate, "variance" = variance))
@@ -521,4 +521,3 @@ n_iter = 10
 results_simulations <- lapply(1:n_iter, \(i) comparison(pop_init, struct_results, N_RCT, N_BOOT_ITER))
 
 saveRDS(results_simulations, file = file.path("results_simulations", paste0("results_simulations", ".RDS")))
-
