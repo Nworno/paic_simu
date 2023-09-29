@@ -1,13 +1,6 @@
-# library(ggplot2)
 library(data.table)
-# library(dplyr)
-# library(tictoc)
-# library(fastglm)
 
-# ggthemr::ggthemr("flat")
-# logit <- function(x) log(x/(1 - x))
-
-######## Parameters
+# Parameters
 ####################
 N_pop <- 10^6
 
@@ -22,7 +15,7 @@ bY_B <- 1.5
 bY_C <- 0
 
 N_RCT <- 200
-N_BOOT_ITER <- 3
+N_BOOT_ITER <- 2
 ######### Models
 ##################
 names_covariates <- c("X1")
@@ -518,6 +511,11 @@ comparison <- function(pop_init, struct_results, N_RCT, N_BOOT_ITER) {
 }
 
 n_iter = 10
-results_simulations <- lapply(1:n_iter, \(i) comparison(pop_init, struct_results, N_RCT, N_BOOT_ITER))
+# pb <- progress::progress_bar$new(total = n_iter)
+results_simulations <- lapply(1:n_iter, \(i) {
+  # pb$tick()
+  cat(i, "\n")
+  comparison(pop_init, struct_results, N_RCT, N_BOOT_ITER)
+})
 
 saveRDS(results_simulations, file = file.path("results_simulations", paste0("results_simulations", ".RDS")))
