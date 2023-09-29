@@ -22,7 +22,7 @@ bY_B <- 1.5
 bY_C <- 0
 
 N_RCT <- 200
-N_BOOT_ITER <- 3
+N_BOOT_ITER <- 2
 ######### Models
 ##################
 names_covariates <- c("X1")
@@ -120,9 +120,40 @@ var_theo_C <- (bY_X1)^2 * (prop_X1) * (1 - prop_X1)
 
 var_theo_AB <- var_theo_A/N_RCT + var_theo_B/N_RCT
 
-#######################
-#### Defining functions
-#######################
+###############################
+########## Unadjusted estimator
+##############################
+
+# (Anchored) naive observed effect in pop_init
+unadjusted_estimator <- function(trial_AC, trial_BC, names_covariates, anchored) {
+  if (anchored) { # ie two steps
+    naive_conditional_model_AC <- glm(obs ~ ttt, family = "gaussian", data = trial_AC)
+    naive_conditional_model_BC <- glm(obs ~ ttt, family = "gaussian", data = trial_BC)
+    naive_AB <- naive_conditional_model_AC$coefficients[["tttA"]] - naive_conditional_model_BC$coefficients[["tttB"]]
+  } else {
+    df <- rbind(trial_AC[, .SD, .SDcols = c("obs", "ttt", names_covariates)],
+                trial_BC[, .SD, .SDcols = c("obs", "ttt", names_covariates)])
+    df[ ,ttt := relevel(ttt, ref = "B")]
+    naive_conditional_model_AB <- glm(obs ~ ttt, family = "gaussian", data = df)
+    naive_AB <- naive_conditional_model_AB$coefficients[["tttA"]]
+    # naive_variance_AB <- vcov(naive_conditional_model_AC)["tttA", "tttA"] + vcov(naive_conditional_model_BC)["tttB", "tttB"]
+    ## Equivalent to
+    # naive_AB <- trial_AC[ttt == "A", mean(obs)] - trial_BC[ttt == "B", mean(obs)]
+    # var_naive_unanchored_AB <- trial_AC[ttt == "A", var(obs) / .N] + trial_BC[ttt == "B", var(obs) / .N]
+  }
+  return(naive_AB)
+}
+
+# (Unanchored) unadjusted observed effect in pop_init
+run_unadjusted_estimator <- function(trial_AC, trial_BC, names_covariates, anchored) {
+  estimate <- unadjusted_estimator(trial_AC, trial_BC, names_covariates, anchored)
+  variance <- sapply(1:N_BOOT_ITER, \(x) unadjusted_estimator(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
+                                                              trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
+                                                              names_covariates,
+                                                              anchored)) |> var()
+  return(list("estimate" = estimate, "variance" = variance))
+}
+
 
 ##############################################################
 ########## REGRESSION BASED OUTCOME MODEL (both treatment IPD)
@@ -137,19 +168,11 @@ var_theo_AB <- var_theo_A/N_RCT + var_theo_B/N_RCT
 
 # centring covariates used in a model predicts the average outcome effect at the level of the value used to center the covariates
 
-# conditional_model <- function(trial, outcome_model, glm_family, ttt_name, ttt_interaction_name, average_interaction_level) {
-#   # model <- fastglm::fastglm(formula = outcome_model, family = glm_family, data = trial)
-#   average_ttt_estimate <- coefficients(model)[ttt_name] + coefficients(model)[ttt_interaction_name] * average_interaction_level
-#   # var_ttt_estimate <- vcov(model)[ttt_name, ttt_name]
-#   # + vcov(model)[ttt_interaction_name, ttt_interaction_name] * average_interaction_level ### /!\ do we need the variance of the interaction too? not used by Phillippo
-#   return(average_ttt_estimate)
-# }
-
-twostep_anchored_conditional_effect <- function(trial_AC, trial_BC, outcome_model, glm_family) {
+anchored_conditional_estimation <- function(trial_AC, trial_BC, outcome_model, glm_family) {
   # two-steps individual patient data meta analysis
   model_AC <- glm(outcome_model, glm_family, data = trial_AC[, X1_centred := X1 - trial_BC[, mean(X1)]])
   estimate_AC <- model_AC$coefficients[["tttA"]]
-  model_BC <- glm(formula(obs ~ X1_centred*ttt), glm_family, data = trial_BC[, X1_centred := X1 - trial_BC[, mean(X1)]])
+  model_BC <- glm(outcome_model, glm_family, data = trial_BC[, X1_centred := X1 - trial_BC[, mean(X1)]])
   estimate_BC <- model_BC$coefficients[["tttB"]]
   estimate_AB <- estimate_AC - estimate_BC
 
@@ -162,10 +185,10 @@ twostep_anchored_conditional_effect <- function(trial_AC, trial_BC, outcome_mode
   return(estimate_AB)
 }
 
-run_twostep_anchored_conditional_effect <- function(trial_AC, trial_BC, outcome_model, glm_family) {
-  estimate <- twostep_anchored_conditional_effect(trial_AC, trial_BC, outcome_model, glm_family)
+run_anchored_conditional_estimation <- function(trial_AC, trial_BC, outcome_model, glm_family) {
+  estimate <- anchored_conditional_estimation(trial_AC, trial_BC, outcome_model, glm_family)
   variance <- sapply(1:N_BOOT_ITER, \(x) {
-    twostep_anchored_conditional_effect(
+    anchored_conditional_estimation(
       trial_AC[sample(1:.N, size = .N, replace = TRUE), .SD, by = ttt],
       trial_BC[sample(1:.N, size = .N, replace = TRUE), .SD, by = ttt],
       outcome_model, gaussian)
@@ -173,55 +196,49 @@ run_twostep_anchored_conditional_effect <- function(trial_AC, trial_BC, outcome_
   return(list("estimate" = estimate, "variance" = variance))
 }
 
-onestep_anchored_conditional_effect <- function(outcome_model, glm_family, data) {
-  # one-step meta-analysis with or without accounting for trial clusterization (which can be with fixed or random effect)
-  # /!\ requires that reference level for ttt variable is B!
-  # In the absence of residual confounding in the DGM (that is all confounders are correctly included in the adjustment model)
-  # trial-level clusterization shouldn't change the results
-  #
-  # outcome_model_w_cluster <- update.formula(test, ~ . + trial)
-  model <- glm(outcome_model, glm_family, data[, X1_centred := X1 - data[trial == "BC", mean(X1)]])
-  estimate_AB <- model$coefficients[["tttA"]]
-  # Equivalent to
-  # model <- glm(outcome_model, glm_family, trials_combined)
-  # estimate_AB <- model$coefficients[["tttA"]] + model$coefficients[["X1:tttA"]] * data[trial == "BC", mean(X1)]
-  return(estimate_AB)
-}
-run_onestep_anchored_conditional_effect <- function(outcome_model, glm_family, data) {
-  estimate <- onestep_anchored_conditional_effect(outcome_model, gaussian, data)
-  variance <- sapply(1:N_BOOT_ITER, \(x)
-                     onestep_anchored_conditional_effect(
-                       outcome_model,
-                       gaussian,
-                       data = data[sample(1:.N, size = .N, replace = TRUE), .SD, by = c("trial", "ttt")]
-                     )) |>
-    var()
-  return(list("estimate" = estimate, "variance" = variance))
-}
 
-##### Unanchored
+### Unanchored
 
-unanchored_conditional_effect <- function(outcome_model, glm_family, trial_AC, trial_BC) {
-  observed_B <- trial_BC[ttt == "B", mean(obs)]
-  # equivalent to
+unanchored_conditional_estimation <- function(trial_AC, trial_BC, outcome_model, glm_family) {
+  observed_B <- trial_BC[ttt == "B", mean(obs)] # unadjusted B effect
+  # equivalent to (with collapsible outcome at least)
   # model_B <- glm(outcome_model, family = glm_family, data = trial_BC[ttt == "B", ])
   # observed_B <- model_B$coefficients[["(Intercept)"]] + model_B$coefficients[["X1"]] * trial_BC[ttt == "B", mean(X1)]
-  model_A <- glm(outcome_model, family = glm_family, data = trial_AC[ttt == "A", ])
-  predicted_A <- coefficients(model_A)[["(Intercept)"]] + coefficients(model_A)[["X1"]] * trial_BC[ttt == "B", mean(X1)]
+
+  model_A <- glm(outcome_model,
+                 family = gaussian,
+                 data = trial_AC[ttt == "A"][, X1_centred := X1 - trial_BC[ttt == "B", mean(X1)]])
+  predicted_A <- coefficients(model_A)[["(Intercept)"]]
   # equivalent to
-  # trial_AC[, X1_centred := X1 - trial_BC[ttt == "B", mean(X1)]]
-  # model_A <- glm(formula(obs ~ X1_centred), family = gaussian, data = trial_AC[ttt == "A", ])
-  # predicted_A <- coefficients(model_A)[["(Intercept)"]]
-  return(predicted_A - observed_B)
+  # model_A <- glm(obs ~ X1, family = glm_family, data = trial_AC[ttt == "A", ])
+  # predicted_A <- coefficients(model_A)[["(Intercept)"]] + coefficients(model_A)[["X1"]] * trial_BC[ttt == "B", mean(X1)] # make the assumption that the effect modification is identical for all treatments
+  estimate_AB <- predicted_A - observed_B
+
+  #### Equivalent to
+  # one-step meta-analysis without accounting for trial clusterization (which can be with fixed or random effect)
+  # In the absence of residual confounding in the DGM (that is all confounders are correctly included in the adjustment model)
+  # trial-level clusterization shouldn't change the results
+  # outcome_model_w_cluster <- update.formula(test, ~ . + trial)
+  #
+  # may allow taking into account the fact that all treatment modifications may not be the same?
+  # stopifnot(levels(trials_combined$ttt)[[1]] == "B")
+  # model <- glm(obs ~ X1_centred*ttt, glm_family, trials_combined[ttt %in% c("A", "B")][, X1_centred := X1 - trial_BC[ttt == "B", mean(X1)]])
+  # estimate_AB <- model$coefficients[["tttA"]]
+  # Equivalent to
+  # model <- glm(obs ~ X1 * ttt, glm_family, data)
+  # estimate_AB <- model$coefficients[["tttA"]] + model$coefficients[["X1:tttA"]] * data[trial == "BC", mean(X1)]
+
+  return(estimate_AB)
 }
 
-run_unanchored_conditional_effect <- function(outcome_model, glm_family, trial_AC, trial_BC) {
-  estimate <- unanchored_conditional_effect(outcome_model, glm_family, trial_AC, trial_BC)
-  variance <- sapply(1:N_BOOT_ITER, \(x) unanchored_conditional_effect(
-    formula(obs ~ X1),
-    gaussian,
+run_unanchored_conditional_estimation <- function(trial_AC, trial_BC, outcome_model, glm_family) {
+  estimate <- unanchored_conditional_estimation(trial_AC, trial_BC, outcome_model, glm_family)
+  variance <- sapply(1:N_BOOT_ITER, \(x) unanchored_conditional_estimation(
     trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
-    trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt])
+    trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
+    outcome_model,
+    gaussian
+  )
   ) |>
     var()
   return(list("estimate" = estimate, "variance" = variance))
@@ -229,73 +246,47 @@ run_unanchored_conditional_effect <- function(outcome_model, glm_family, trial_A
 
 
 
-##########################
-########## Naive estimator
-##########################
-
-# (Anchored) naive observed (or marginal, identical in that case) effect in pop_init
-
-##TODO: Two steps naive estimator, could also do one step two, just like linear models
-naive_estimator <- function(trial_AC, trial_BC, names_covariates, anchored, two_step = NULL) {
-  if (anchored) {
-    if (two_step) {
-      naive_conditional_model_AC <- glm(obs ~ ttt, family = "gaussian", data = trial_AC)
-      naive_conditional_model_BC <- glm(obs ~ ttt, family = "gaussian", data = trial_BC)
-      naive_AB <- naive_conditional_model_AC$coefficients[["tttA"]] - naive_conditional_model_BC$coefficients[["tttB"]]
-    } else {
-      df <- rbind(trial_AC[, .SD, .SDcols = c("obs", "ttt", names_covariates)],
-                  trial_BC[, .SD, .SDcols = c("obs", "ttt", names_covariates)])
-      df[ ,ttt := relevel(ttt, ref = "B")]
-      naive_conditional_model_AB <- glm(obs ~ ttt, family = "gaussian", data = df)
-      naive_AB <- naive_conditional_model_AB$coefficients[["tttA"]]
-      # naive_variance_AB <- vcov(naive_conditional_model_AC)["tttA", "tttA"] + vcov(naive_conditional_model_BC)["tttB", "tttB"]
-    }
-  } else {
-    naive_AB <- trial_AC[ttt == "A", mean(obs)] - trial_BC[ttt == "B", mean(obs)]
-    # var_naive_unanchored_AB <- trial_AC[ttt == "A", var(obs) / .N] + trial_BC[ttt == "B", var(obs) / .N]
-  }
-  return(naive_AB)
-}
-
-# (Unanchored) unadjusted observed effect in pop_init
-run_naive_estimator <- function(trial_AC, trial_BC, names_covariates, anchored, two_step = NULL) {
-  estimate <- naive_estimator(trial_AC, trial_BC, names_covariates, anchored, two_step)
-  variance <- sapply(1:N_BOOT_ITER, \(x) naive_estimator(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
-                                                         trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
-                                                         names_covariates,
-                                                         anchored,
-                                                         two_step)) |> var()
-  return(list("estimate" = estimate, "variance" = variance))
-}
-
-
 ########## PROPENSITY SCORE
-propensity_score <- function(df, anchored) {
-  stopifnot(levels(df$trial)[[1]] == "AC")
-  df$PS_BC_trial <- glm(trial ~ X1, df, family = binomial(link = "logit"))$fitted.values
-  df[, ATT_BC_w := (trial == "BC") + (trial == "AC") * PS_BC_trial / (1 - PS_BC_trial)]
+propensity_score <- function(trial_AC, trial_BC, anchored) {
+  df_anchored <- rbindlist(list("AC" = trial_AC, "BC" = trial_BC), idcol = "trial", fill = TRUE)
+  df_anchored[, trial := as.factor(trial)]
+  df_unanchored <- df_anchored[ttt %in% c("A", "B")]
+  stopifnot(levels(df_anchored$trial)[[1]] == "AC")
+  stopifnot(levels(df_unanchored$trial)[[1]] == "AC")
+  # /!\ a major difference between anchored and unanchored here is that anchored has 2x more patients!
   if (anchored) {
-    # obs_marginal_AC <- df[trial == "AC" & ttt == "A", sum(obs * ATT_BC_w) / sum(ATT_BC_w)] - df[trial == "AC" & ttt == "C", sum(obs * ATT_BC_w) / sum(ATT_BC_w)]
-    # obs_marginal_BC <- df[trial == "BC" & ttt == "B", mean(obs)] - df[trial == "BC" & ttt == "C", mean(obs)]
+    # predicting belonging to the AC trial
+    df_anchored$PS_BC_trial <- glm(trial ~ X1, df_anchored, family = binomial(link = "logit"))$fitted.values
+    df_anchored$ATC_w <- df_anchored[, (trial == "BC") + (trial == "AC") * PS_BC_trial / (1 - PS_BC_trial)]
+  } else {
+    df_unanchored$PS_B_trial <- glm(trial ~ X1, data = df_unanchored, family = binomial(link = "logit"))$fitted.values
+    df_unanchored$ATC_w <- df_unanchored[, (trial == "BC") + (trial == "AC") * PS_B_trial / (1 - PS_B_trial)]
+  }
+  if (anchored) {
+    # obs_marginal_AC <- df_anchored[trial == "AC" & ttt == "A", weighted.mean(obs, ATC_w)] -
+    #   df_anchored[trial == "AC" & ttt == "C", weighted.mean(obs, ATC_w)]
+    # obs_marginal_BC <- df_anchored[trial == "BC" & ttt == "B", mean(obs)] -
+    #   df_anchored[trial == "BC" & ttt == "C", mean(obs)]
     # estimate_AB <- obs_marginal_AC - obs_marginal_BC
     # var_anchored_marginal_AB <- trials_combined[trial == "AC" & ttt == "A", var(obs * ATT_BC_w) / (.N * mean(ATT_BC_w))] + trials_combined[trial == "AC" & ttt == "C", var(obs * ATT_BC_w) / (.N * mean(ATT_BC_w))] + trials_combined[trial == "BC" & ttt == "B", var(obs * ATT_BC_w) / (.N * mean(ATT_BC_w))] + trials_combined[trial == "BC" & ttt == "C", var(obs * ATT_BC_w) / (.N * mean(ATT_BC_w))]
     # ### Alternative implementation
-    model_marginal_AC <- glm(obs ~ ttt, family = gaussian, data = df[trial == "AC"], weights = ATT_BC_w)
-    model_marginal_BC <- glm(obs ~ ttt, family = gaussian, data = df[trial == "BC"])
+    model_marginal_AC <- glm(obs ~ ttt, family = gaussian, data = df_anchored[trial == "AC"], weights = ATC_w)
+    model_marginal_BC <- glm(obs ~ ttt, family = gaussian, data = df_anchored[trial == "BC"])
     estimate_AB <- model_marginal_AC$coefficients[["tttA"]] - model_marginal_BC$coefficients[["tttB"]]
     # var_anchored_marginal_AB <- sandwich::vcovHC(model_marginal_AC)["tttA", "tttA"] +
     #   sandwich::vcovHC(model_marginal_BC)["tttB", "tttB"]
   } else {
-    estimate_AB <- df[trial == "AC" & ttt == "A", weighted.mean(obs, ATT_BC_w)] -
-      df[trial == "BC" & ttt == "B", mean(obs)]
+    estimate_AB <- df_unanchored[ttt == "A", weighted.mean(obs, ATC_w)] - df_unanchored[ttt == "B", mean(obs)]
     # var_unanchored_marginal_AB <- trials_combined[trial == "AC" & ttt == "A", var(obs * ATT_BC_w) / (.N * mean(ATT_BC_w))] + trials_combined[trial == "BC" & ttt == "B", var(obs * ATT_BC_w) / (.N * mean(ATT_BC_w))]
   }
   return(estimate_AB)
 }
 
-run_propensity_score <- function(trials_combined, anchored) {
-  estimate <- propensity_score(trials_combined, anchored)
-  variance <- sapply(1:N_BOOT_ITER, \(x) propensity_score(trials_combined[sample(1:.N, .N, replace = TRUE), .SD, by = c("trial", "ttt")], anchored)) |> var()
+run_propensity_score <- function(trial_AC, trial_BC, anchored) {
+  estimate <- propensity_score(trial_AC, trial_BC, anchored)
+  variance <- sapply(1:N_BOOT_ITER, \(x) propensity_score(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = c("ttt")],
+                                                          trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = c("ttt")],
+                                                          anchored)) |> var()
   return(list("estimate" = estimate, "variance" = variance))
 }
 
@@ -312,52 +303,40 @@ mm_grad_fun <- function(params, X) {
   colSums(sweep(X, 1, exp(X %*% params), FUN = "*"))
 }
 
-maic <- function(trial_AC, Ag_trial_BC, names_covariates, anchored) {
+maic <- function(trial_AC, trial_BC, names_covariates, anchored) {
   if (anchored) {
-    mean_trial_BC <- Ag_trial_BC[, sum(mean_X1*n) / sum(n)] # not using mean() in case n is different between ttt arms
-    centered_covariates <- sweep(trial_AC[, ..names_covariates], 2, mean_trial_BC, FUN = "-")
+    mean_X1_trial_BC <- trial_BC[, mean(X1)]
+    centered_covariates <- sweep(trial_AC[, ..names_covariates], 2, mean_X1_trial_BC, FUN = "-")
   } else {
-    mean_ttt_B <- Ag_trial_BC[ttt == "B", mean_X1]
-    centered_covariates <- sweep(trial_AC[ttt == "A", ..names_covariates], 2, mean_ttt_B, FUN = "-")
+    mean_X1_ttt_B <- trial_BC[ttt == "B", mean(X1)]
+    centered_covariates <- sweep(trial_AC[ttt == "A", ..names_covariates], 2, mean_X1_ttt_B, FUN = "-")
   }
   random_init <- rep(0, ncol(centered_covariates))
   params <- optim(random_init, fn = mm_obj_fun, gr = mm_grad_fun, method = "BFGS", X = data.matrix(centered_covariates))$par
-  weights <- exp(data.matrix(centered_covariates) %*% matrix(params, nrow = 1)) #TODO check this line
+  weights <- exp(data.matrix(centered_covariates) %*% matrix(params, nrow = 1))
   # ess <- sum(weights)^2 / sum(weights^2)
   if (anchored) {
     trial_AC$weights <- weights
     fitted_AC_w <- glm(obs ~ ttt, data = trial_AC, family = gaussian, weights = weights)
     anchored_MAIC_AC <- fitted_AC_w$coefficients[["tttA"]]
-    obs_marginal_BC <- Ag_trial_BC[ttt == "B", mean_obs] - Ag_trial_BC[ttt == "C", mean_obs]
+    # Equivalent to
+    # trial_AC[ttt == "A", weighted.mean(obs, weights)] - trial_AC[ttt == "C", weighted.mean(obs, weights)]
+    obs_marginal_BC <- trial_BC[ttt == "B", mean(obs)] - trial_BC[ttt == "C", mean(obs)]
     estimate_AB <- anchored_MAIC_AC - obs_marginal_BC
-    # design <- survey::svydesign(ids = ~ 1, weights = weights, data = trial_AC)
-    # svymodel <- survey::svyglm(formula = obs ~ ttt, design = design)
-    #
-    # (var_adjusted_marginal_MAIC_AC <- sandwich::vcovHC(fitted_AC_w, type = "HC3")["tttA", "tttA"])
-    # (var(trial_AC[ttt == "A", "obs"])/nrow(trial_AC[ttt == "A", ]) + var(trial_BC[ttt == "B", "obs"])/nrow(trial_BC[ttt == "B", ]))
-    # (vcov(svymodel)["tttA", "tttA"])
   } else {
-    ttt_A <- trial_AC[ttt == "A", .(weights = weights, obs)]
-    estimate_AB <- ttt_A[, weighted.mean(obs, weights)] - Ag_trial_BC[ttt == "B", mean_obs]
-    # var_unanchored_marginal_MAIC_AB <- trial_AC[ttt == "A", var(obs*weights) / (.N * mean(weights))] + trial_BC[ttt == "B", var(obs)/.N]
+    estimate_AB <- trial_AC[ttt == "A", weighted.mean(obs, weights)] - trial_BC[ttt == "B", mean(obs)]
   }
   return(estimate_AB)
 }
 
-run_maic <- function(trial_AC, Ag_trial_BC, names_covariates, anchored) {
+run_maic <- function(trial_AC, trial_BC, names_covariates, anchored) {
   stopifnot(levels(trial_AC$ttt)[[1]] == "C")
-  estimate <- maic(trial_AC, Ag_trial_BC, names_covariates, anchored = TRUE)
+  estimate <- maic(trial_AC, trial_BC, names_covariates, anchored = anchored)
   variance <- sapply(1:N_BOOT_ITER, \(x) maic(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
-                                              Ag_trial_BC,
+                                              trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
                                               names_covariates,
-                                              anchored = TRUE)) |>
+                                              anchored = anchored)) |>
     var()
-  if (anchored) {
-    # necessary to add variance of B and C outcomes even when bootstrapping the variance
-    variance <- variance + Ag_trial_BC[ttt == "B", var_obs/n] + Ag_trial_BC[ttt == "C", var_obs/n]
-  } else {
-    variance <- variance + Ag_trial_BC[ttt == "B", var_obs/n]
-  }
   return(list("estimate" = estimate, "variance" = variance))
 }
 
@@ -366,42 +345,38 @@ run_maic <- function(trial_AC, Ag_trial_BC, names_covariates, anchored) {
 ##########
 
 
-stc <- function(trial_AC, Ag_trial_BC, anchored, average_conditional_BC = NULL, average_conditional_B = NULL) {
+stc <- function(trial_AC, trial_BC, anchored) {
   if (anchored) {
-    trial_AC$X1_centred <- trial_AC$X1 - Ag_trial_BC[ttt == "overall", mean_X1]
-    stc_model <- glm(obs ~ ttt*X1_centred, family = gaussian, data = trial_AC)
+    average_observed_BC <- trial_BC[ttt == "B", mean(obs)] - trial_BC[ttt == "C", mean(obs)]
+    stc_model <- glm(obs ~ ttt*X1_centred,
+                     family = gaussian,
+                     data = trial_AC[, X1_centred := X1 - trial_BC[, mean(X1)]])
     estimate_AC <- stc_model$coefficients[["tttA"]]
-    estimate_AB <- estimate_AC - average_conditional_BC
     # Equivalent to
     # stc_model <- glm(obs ~ ttt*X1, family = gaussian, data = trial_AC)
     # estimate_AC <- stc_model$coefficients[["tttA"]] + stc_model$coefficients[["tttA:X1"]] * Ag_trial_BC[, sum(mean_X1*n)/sum(n)]
+    estimate_AB <- estimate_AC - average_observed_BC
   } else {
-    ttt_A <- trial_AC[, X1_centred := X1 - Ag_trial_BC[ttt == "B", mean_X1]][ttt == "A"]
-    stc_model <- glm(obs ~ X1_centred, family = gaussian, data = ttt_A)
+    average_observed_B <- trial_BC[ttt == "B", mean(obs)]
+    stc_model <- glm(obs ~ X1_centred,
+                     family = gaussian,
+                     data = trial_AC[ttt == "A"][, X1_centred := X1 - trial_BC[ttt == "B", mean(X1)]])
     simulated_A <- stc_model$coefficients[["(Intercept)"]]
-    estimate_AB <- simulated_A - average_conditional_B
     # Equivalent to
     # ttt_A <- trial_AC[ttt == "A"]
     # stc_model <- glm(obs ~ X1, family = gaussian, data = ttt_A)
     # simulated_A <- stc_model$coefficients[["(Intercept)"]] + stc_model$coefficients[["X1"]] * trial_BC[ttt == "B", mean(X1)]
+    estimate_AB <- simulated_A - average_observed_B
   }
   return(estimate_AB)
 }
 
-run_stc <- function(trial_AC, Ag_trial_BC, anchored, average_conditional_BC = NULL, average_conditional_B = NULL) {
-  estimate <- stc(trial_AC, Ag_trial_BC, anchored, average_conditional_BC, average_conditional_B)
+run_stc <- function(trial_AC, trial_BC, anchored) {
+  estimate <- stc(trial_AC, trial_BC, anchored)
   variance <- sapply(1:N_BOOT_ITER, \(x) stc(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
-                                             Ag_trial_BC,
-                                             anchored,
-                                             average_conditional_BC,
-                                             average_conditional_B)) |>
+                                             trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
+                                             anchored)) |>
     var()
-  if (anchored) {
-    #TODO: for AgD variance, may need to use the variance of the conditional estimator, and not the variance of the outcome
-    variance <- variance + Ag_trial_BC[ttt == "B", var_obs/n] + Ag_trial_BC[ttt == "C", var_obs/n]
-  } else {
-    variance <- variance + Ag_trial_BC[ttt == "B", var_obs/n]
-  }
   return(list("estimate" = estimate, "variance" = variance))
 }
 
@@ -411,12 +386,12 @@ run_stc <- function(trial_AC, Ag_trial_BC, anchored, average_conditional_BC = NU
 #############################
 
 struct_results <- list(
-  naive = list(
-    anchored = list(onestep_glm = NULL, twostep_glm = NULL),
-    unanchored = list(glm = NULL)
+  unadjusted = list(
+    anchored = list(agd = NULL),
+    unanchored = list(agd = NULL)
   ),
   regression = list(
-    anchored = list(onestep_glm = NULL, twostep_glm = NULL, stc = NULL),
+    anchored = list(glm = NULL, stc = NULL),
     unanchored = list(glm = NULL, stc = NULL)
   ),
   iptw = list(
@@ -440,8 +415,8 @@ comparison <- function(pop_init, struct_results, N_RCT, N_BOOT_ITER) {
     sample(pop_init$id, N_RCT, replace = FALSE, prob = pop_init$prob_BC), # use integer based indexing
     .(id, ttt = factor(rep_len(c("B", "C"), length.out = N_RCT), levels = c("C","A", "B")))][
       pop_init_long[,c("id", "X1", "ttt", "prob_BC", "theo", "obs")], on = .(id, ttt), nomatch = NULL]
-  trials_combined <- data.table::rbindlist(list("AC" = trial_AC, "BC" = trial_BC), fill = TRUE, idcol = "trial")[, trial := factor(trial, levels = c("AC", "BC"))] |> setkey("id")
 
+  # Not used currently
   Ag_trial_BC <- rbind(
     trial_BC[, .("mean_X1" = mean(X1), "var_X1" = var(X1), "n" = length(id),
                  "mean_theo" = mean(theo), "var_theo" = var(theo),
@@ -452,57 +427,38 @@ comparison <- function(pop_init, struct_results, N_RCT, N_BOOT_ITER) {
                  "mean_obs" = mean(obs), "var_obs" = var(obs))]
   )
 
+  ###############################
+  ########## Unadjusted estimator
+  ###############################
+  struct_results$unadjusted$anchored$unadjusted <- run_unadjusted_estimator(trial_AC, trial_BC, names_covariates, anchored = TRUE)
+  struct_results$unadjusted$unanchored$unadjusted <- run_unadjusted_estimator(trial_AC, trial_BC, names_covariates, anchored = FALSE)
+
   ##############################################################
   ########## REGRESSION BASED OUTCOME MODEL (both treatment IPD)
   ##############################################################
 
-  struct_results$regression$anchored$twostep_glm <- run_twostep_anchored_conditional_effect(trial_AC, trial_BC, formula(obs ~ X1_centred*ttt), gaussian)
-
-  trials_combined[, ttt := relevel(ttt, ref = "B")]
-  stopifnot(levels(trials_combined$ttt)[[1]] == "B")
-  struct_results$regression$anchored$onestep_glm <- run_onestep_anchored_conditional_effect(formula(obs ~ X1_centred*ttt), gaussian, trials_combined)
-  struct_results$regression$unanchored$glm <- run_unanchored_conditional_effect(formula(obs ~ X1), gaussian, trial_AC, trial_BC)
-
+  struct_results$regression$anchored$glm <- run_anchored_conditional_estimation(trial_AC, trial_BC, formula(obs ~ X1_centred*ttt), gaussian)
+  struct_results$regression$unanchored$glm <- run_unanchored_conditional_estimation(trial_AC, trial_BC, formula(obs ~ X1_centred), gaussian)
 
   #################################################
   ########### PROPENSITY SCORE (both treatment IPD)
   #################################################
 
-  trials_combined[, ttt := relevel(ttt, ref = "C")]
-  stopifnot(levels(trials_combined)[[1]] == "C")
-  struct_results$iptw$anchored$ml <- run_propensity_score(trials_combined, anchored = TRUE)
-  struct_results$iptw$unanchored$ml <- run_propensity_score(trials_combined, anchored = FALSE)
-
-
-  ##########################
-  ########## Naive estimator
-  ##########################
-
-  struct_results$naive$anchored$onestep_glm <- run_naive_estimator(trial_AC, trial_BC, names_covariates, anchored = TRUE, two_step = FALSE)
-  struct_results$naive$anchored$twostep_glm <- run_naive_estimator(trial_AC, trial_BC, names_covariates, anchored = TRUE, two_step = TRUE)
-  struct_results$naive$unanchored$glm <- run_naive_estimator(trial_AC, trial_BC, names_covariates, anchored = FALSE)
-
+  struct_results$iptw$anchored$ml <- run_propensity_score(trial_AC, trial_BC, anchored = TRUE)
+  struct_results$iptw$unanchored$ml <- run_propensity_score(trial_AC, trial_BC, anchored = FALSE)
 
   #########
   ### MAIC
   #########
-  struct_results$iptw$anchored$maic <-  run_maic(trial_AC, Ag_trial_BC, names_covariates, anchored = TRUE)
-  struct_results$iptw$unanchored$maic <- run_maic(trial_AC, Ag_trial_BC, names_covariates, anchored = FALSE)
+  struct_results$iptw$anchored$maic <- run_maic(trial_AC, trial_BC, names_covariates, anchored = TRUE)
+  struct_results$iptw$unanchored$maic <- run_maic(trial_AC, trial_BC, names_covariates, anchored = FALSE)
 
   ##########
   ###### STC
   ##########
 
-  # the two are equivalent with a collapsible outcome, but not with a non-collapsible one
-  model_conditional_BC <- glm(formula(obs ~ X1*ttt), gaussian, data = trial_BC)
-  average_conditional_BC <- model_conditional_BC$coefficients[["tttB"]] + model_conditional_BC$coefficients[["X1:tttB"]] * trial_BC[, mean(X1)]
-
-  model_conditional_B <- glm(formula(obs ~ X1), gaussian, trial_BC[ttt == "B", ])
-  average_conditional_B <- model_conditional_B$coefficients[["(Intercept)"]] + model_conditional_B$coefficients[["X1"]] * trial_BC[ttt == "B", mean(X1)]
-  # conditional_B <- trial_BC[ttt == "B", mean(obs)]
-
-  struct_results$regression$anchored$stc <- run_stc(trial_AC, Ag_trial_BC, anchored = TRUE, average_conditional_BC = average_conditional_BC)
-  struct_results$regression$unanchored$stc <- run_stc(trial_AC, Ag_trial_BC, anchored = FALSE, average_conditional_B = average_conditional_B)
+  struct_results$regression$anchored$stc <- run_stc(trial_AC, trial_BC, anchored = TRUE)
+  struct_results$regression$unanchored$stc <- run_stc(trial_AC, trial_BC, anchored = FALSE)
 
 
   ##############################
@@ -519,5 +475,4 @@ comparison <- function(pop_init, struct_results, N_RCT, N_BOOT_ITER) {
 
 n_iter = 10
 results_simulations <- lapply(1:n_iter, \(i) comparison(pop_init, struct_results, N_RCT, N_BOOT_ITER))
-
 saveRDS(results_simulations, file = file.path("results_simulations", paste0("results_simulations", ".RDS")))
