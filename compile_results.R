@@ -3,7 +3,7 @@ library(dplyr)
 library(ggplot2)
 library(ggthemr)
 ggthemr::ggthemr("pale")
-results_simulations <- readRDS("results_simulations/results_simulations.RDS")
+results_simulations <- readRDS("results_simulations_sacha_3/results_simulations.RDS")
 
 long_results <- data.table::rbindlist(results_simulations, idcol ="n_iter")[
   , data := ifelse(model %in% c("maic", "stc"),

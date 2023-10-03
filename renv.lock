@@ -181,6 +181,23 @@
       ],
       "Hash": "85846544c596e71f8f46483ab165da33"
     },
+    "ggthemr": {
+      "Package": "ggthemr",
+      "Version": "1.1.0",
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteRepo": "ggthemr",
+      "RemoteUsername": "Mikata-Project",
+      "RemoteRef": "HEAD",
+      "RemoteSha": "f04aca60b5e0c7a4b6af324a6b3bbcaa9d35609b",
+      "Requirements": [
+        "R",
+        "ggplot2",
+        "scales"
+      ],
+      "Hash": "1771ffd971cc3e7ea1c4c3f3ed422add"
+    },
     "glue": {
       "Package": "glue",
       "Version": "1.6.2",
