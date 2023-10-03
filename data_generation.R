@@ -15,7 +15,7 @@ bY_B <- 1.5
 bY_C <- 0
 
 N_RCT <- 200
-N_BOOT_ITER <- 2
+N_BOOT_ITER <- 100
 ######### Models
 ##################
 names_covariates <- c("X1")
@@ -143,7 +143,8 @@ run_unadjusted_estimator <- function(trial_AC, trial_BC, names_covariates, ancho
   boot_estimates <- parallel::mclapply(1:N_BOOT_ITER, \(x) unadjusted_estimator(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
                                                                                trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
                                                                                names_covariates,
-                                                                               anchored))
+                                                                               anchored), 
+  mc.cores = 1L)
   variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var(na.rm = TRUE)
   return(list("estimate" = estimate, "variance" = variance))
 }
@@ -186,7 +187,7 @@ run_anchored_conditional_estimation <- function(trial_AC, trial_BC, outcome_mode
       trial_AC[sample(1:.N, size = .N, replace = TRUE), .SD, by = ttt],
       trial_BC[sample(1:.N, size = .N, replace = TRUE), .SD, by = ttt],
       outcome_model, gaussian)
-  })
+  }, mc.cores = 1L)
   variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var()
   return(list("estimate" = estimate, "variance" = variance))
 }
@@ -233,7 +234,7 @@ run_unanchored_conditional_estimation <- function(trial_AC, trial_BC, outcome_mo
     trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
     outcome_model,
     gaussian
-  ))
+  ), mc.cores = 1L)
   variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var()
   return(list("estimate" = estimate, "variance" = variance))
 }
@@ -280,7 +281,7 @@ run_propensity_score <- function(trial_AC, trial_BC, anchored) {
   estimate <- propensity_score(trial_AC, trial_BC, anchored)
   boot_estimates <- parallel::mclapply(1:N_BOOT_ITER, \(x) propensity_score(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = c("ttt")],
                                                           trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = c("ttt")],
-                                                          anchored))
+                                                          anchored), mc.cores = 1L)
   variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var()
   return(list("estimate" = estimate, "variance" = variance))
 }
@@ -330,7 +331,7 @@ run_maic <- function(trial_AC, trial_BC, names_covariates, anchored) {
   boot_estimates <- parallel::mclapply(1:N_BOOT_ITER, \(x) maic(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
                                               trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
                                               names_covariates,
-                                              anchored = anchored))
+                                              anchored = anchored), mc.cores = 1L)
   variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var()
   return(list("estimate" = estimate, "variance" = variance))
 }
@@ -370,7 +371,7 @@ run_stc <- function(trial_AC, trial_BC, anchored) {
   estimate <- stc(trial_AC, trial_BC, anchored)
   boot_estimates <- parallel::mclapply(1:N_BOOT_ITER, \(x) stc(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
                                              trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
-                                             anchored))
+                                             anchored), mc.cores = 1L)
   variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var()
   return(list("estimate" = estimate, "variance" = variance))
 }
@@ -471,10 +472,15 @@ comparison <- function(pop_init, struct_results, N_RCT, N_BOOT_ITER) {
 n_iter = 10
 
 # pb <- progress::progress_bar$new(total = n_iter)
+time_start <- Sys.time()
 results_simulations <- lapply(1:n_iter, \(i) {
   # pb$tick()
-  cat(i, "\n")
+  time_start_iteration <- Sys.time()
+  cat("Iteration ", i, "\n")
   comparison(pop_init, struct_results, N_RCT, N_BOOT_ITER)
+  time_eluded <- Sys.time() - time_start_iteration
+  cat("Iteration lenth: ", time_eluded, "seconds\n")
 })
+cat("Simulation length ", time_start - Sys.time(), "seconds \n")
 
 saveRDS(results_simulations, file = file.path("results_simulations", paste0("results_simulations", ".RDS")))
