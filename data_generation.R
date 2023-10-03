@@ -1,5 +1,6 @@
 library(data.table)
 
+options(mc.cores = 110)
 # Parameters
 ####################
 N_pop <- 10^6
@@ -16,6 +17,7 @@ bY_C <- 0
 
 N_RCT <- 200
 N_BOOT_ITER <- 100
+
 ######### Models
 ##################
 names_covariates <- c("X1")
@@ -459,7 +461,7 @@ comparison <- function(pop_init, struct_results, N_RCT, N_BOOT_ITER) {
 
   ##############################
   ############ COMPILING RESULTS
-  ##############################
+ results_simulations ##############################
   rectangle_results <- struct_results |> tibble::enframe() |>
     tidyr::unnest_longer(value, indices_to = "anchored") |>
     tidyr::unnest_longer(value, indices_to = "model") |>
@@ -469,17 +471,17 @@ comparison <- function(pop_init, struct_results, N_RCT, N_BOOT_ITER) {
   return(rectangle_results)
 }
 
-n_iter = 10
+n_iter = 200
 
 # pb <- progress::progress_bar$new(total = n_iter)
 time_start <- Sys.time()
-results_simulations <- lapply(1:n_iter, \(i) {
+results_simulations <- parallel::mclapply(1:n_iter, \(i) {
   # pb$tick()
   time_start_iteration <- Sys.time()
-  cat("Iteration ", i, "\n")
-  comparison(pop_init, struct_results, N_RCT, N_BOOT_ITER)
+  result_comparison <- comparison(pop_init, struct_results, N_RCT, N_BOOT_ITER)
   time_eluded <- Sys.time() - time_start_iteration
-  cat("Iteration lenth: ", time_eluded, "seconds\n")
+  cat("Iteration length: ", time_eluded, "seconds\n")
+  return(result_comparison)
 })
 cat("Simulation length ", time_start - Sys.time(), "seconds \n")
 
