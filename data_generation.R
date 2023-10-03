@@ -145,7 +145,7 @@ run_unadjusted_estimator <- function(trial_AC, trial_BC, names_covariates, ancho
   boot_estimates <- parallel::mclapply(1:N_BOOT_ITER, \(x) unadjusted_estimator(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
                                                                                trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
                                                                                names_covariates,
-                                                                               anchored), 
+                                                                               anchored),
   mc.cores = 1L)
   variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var(na.rm = TRUE)
   return(list("estimate" = estimate, "variance" = variance))
@@ -461,7 +461,7 @@ comparison <- function(pop_init, struct_results, N_RCT, N_BOOT_ITER) {
 
   ##############################
   ############ COMPILING RESULTS
- results_simulations ##############################
+  ##############################
   rectangle_results <- struct_results |> tibble::enframe() |>
     tidyr::unnest_longer(value, indices_to = "anchored") |>
     tidyr::unnest_longer(value, indices_to = "model") |>
@@ -471,7 +471,7 @@ comparison <- function(pop_init, struct_results, N_RCT, N_BOOT_ITER) {
   return(rectangle_results)
 }
 
-n_iter = 200
+n_iter = 2
 
 # pb <- progress::progress_bar$new(total = n_iter)
 time_start <- Sys.time()
@@ -483,6 +483,6 @@ results_simulations <- parallel::mclapply(1:n_iter, \(i) {
   cat("Iteration length: ", time_eluded, "seconds\n")
   return(result_comparison)
 })
-cat("Simulation length ", time_start - Sys.time(), "seconds \n")
+cat("Simulation length ", Sys.time() - time_start, "seconds \n")
 
 saveRDS(results_simulations, file = file.path("results_simulations", paste0("results_simulations", ".RDS")))
