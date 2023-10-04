@@ -6,7 +6,7 @@ library(ggthemr)
 library(patchwork)
 library(data.table)
 ggthemr::ggthemr("pale")
-results_simulations <- readRDS("results_simulations_sacha_5/results_simulations.RDS")
+results_simulations <- readRDS("results_simulations/results_simulations.RDS")
 
 long_results <- bind_rows(results_simulations, .id = "n_iter") |>
   mutate(data = ifelse(model %in% c("maic", "stc"),

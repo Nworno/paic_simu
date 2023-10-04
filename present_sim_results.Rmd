@@ -18,7 +18,7 @@ library(ggthemr)
 library(patchwork)
 library(data.table)
 ggthemr::ggthemr("pale")
-results_simulations <- readRDS("results_simulations_sacha_5/results_simulations.RDS")
+results_simulations <- readRDS("results_simulations/results_simulations.RDS")
 
 ```
 

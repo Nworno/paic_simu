@@ -142,11 +142,10 @@ unadjusted_estimator <- function(trial_AC, trial_BC, names_covariates, anchored)
 # (Unanchored) unadjusted observed effect in pop_init
 run_unadjusted_estimator <- function(trial_AC, trial_BC, names_covariates, anchored) {
   estimate <- unadjusted_estimator(trial_AC, trial_BC, names_covariates, anchored)
-  boot_estimates <- parallel::mclapply(1:N_BOOT_ITER, \(x) unadjusted_estimator(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
+  boot_estimates <- lapply(1:N_BOOT_ITER, \(x) unadjusted_estimator(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
                                                                                trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
                                                                                names_covariates,
-                                                                               anchored),
-  mc.cores = 1L)
+                                                                               anchored))
   variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var(na.rm = TRUE)
   return(list("estimate" = estimate, "variance" = variance))
 }
@@ -184,12 +183,12 @@ anchored_conditional_estimation <- function(trial_AC, trial_BC, outcome_model, g
 
 run_anchored_conditional_estimation <- function(trial_AC, trial_BC, outcome_model, glm_family) {
   estimate <- anchored_conditional_estimation(trial_AC, trial_BC, outcome_model, glm_family)
-  boot_estimates <- parallel::mclapply(1:N_BOOT_ITER, \(x) {
+  boot_estimates <- lapply(1:N_BOOT_ITER, \(x) {
     anchored_conditional_estimation(
       trial_AC[sample(1:.N, size = .N, replace = TRUE), .SD, by = ttt],
       trial_BC[sample(1:.N, size = .N, replace = TRUE), .SD, by = ttt],
       outcome_model, gaussian)
-  }, mc.cores = 1L)
+  })
   variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var()
   return(list("estimate" = estimate, "variance" = variance))
 }
@@ -231,12 +230,12 @@ unanchored_conditional_estimation <- function(trial_AC, trial_BC, outcome_model,
 
 run_unanchored_conditional_estimation <- function(trial_AC, trial_BC, outcome_model, glm_family) {
   estimate <- unanchored_conditional_estimation(trial_AC, trial_BC, outcome_model, glm_family)
-  boot_estimates <- parallel::mclapply(1:N_BOOT_ITER, \(x) unanchored_conditional_estimation(
+  boot_estimates <- lapply(1:N_BOOT_ITER, \(x) unanchored_conditional_estimation(
     trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
     trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
     outcome_model,
     gaussian
-  ), mc.cores = 1L)
+  ))
   variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var()
   return(list("estimate" = estimate, "variance" = variance))
 }
@@ -281,9 +280,9 @@ propensity_score <- function(trial_AC, trial_BC, anchored) {
 
 run_propensity_score <- function(trial_AC, trial_BC, anchored) {
   estimate <- propensity_score(trial_AC, trial_BC, anchored)
-  boot_estimates <- parallel::mclapply(1:N_BOOT_ITER, \(x) propensity_score(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = c("ttt")],
+  boot_estimates <- lapply(1:N_BOOT_ITER, \(x) propensity_score(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = c("ttt")],
                                                           trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = c("ttt")],
-                                                          anchored), mc.cores = 1L)
+                                                          anchored))
   variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var()
   return(list("estimate" = estimate, "variance" = variance))
 }
@@ -330,10 +329,10 @@ maic <- function(trial_AC, trial_BC, names_covariates, anchored) {
 run_maic <- function(trial_AC, trial_BC, names_covariates, anchored) {
   stopifnot(levels(trial_AC$ttt)[[1]] == "C")
   estimate <- maic(trial_AC, trial_BC, names_covariates, anchored = anchored)
-  boot_estimates <- parallel::mclapply(1:N_BOOT_ITER, \(x) maic(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
+  boot_estimates <- lapply(1:N_BOOT_ITER, \(x) maic(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
                                               trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
                                               names_covariates,
-                                              anchored = anchored), mc.cores = 1L)
+                                              anchored = anchored))
   variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var()
   return(list("estimate" = estimate, "variance" = variance))
 }
@@ -371,9 +370,9 @@ stc <- function(trial_AC, trial_BC, anchored) {
 
 run_stc <- function(trial_AC, trial_BC, anchored) {
   estimate <- stc(trial_AC, trial_BC, anchored)
-  boot_estimates <- parallel::mclapply(1:N_BOOT_ITER, \(x) stc(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
+  boot_estimates <- lapply(1:N_BOOT_ITER, \(x) stc(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
                                              trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
-                                             anchored), mc.cores = 1L)
+                                             anchored))
   variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var()
   return(list("estimate" = estimate, "variance" = variance))
 }
