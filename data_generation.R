@@ -466,17 +466,16 @@ comparison <- function(pop_init, struct_results, N_RCT, N_BOOT_ITER) {
     tidyr::unnest_longer(value, indices_to = "anchored") |>
     tidyr::unnest_longer(value, indices_to = "model") |>
     tidyr::unnest_longer(value, indices_to = "indicator") |>
+    dplyr::rename(adjustment = name) |>
     tidyr::pivot_wider(names_from = indicator, values_from = value) |>
-    dplyr::bind_rows(data.frame(name = "true", model = c("conditional", "marginal"), anchored = NA, estimate = c(true_conditional_AB, true_marginal_AB), variance = var_theo_AB))
+    dplyr::bind_rows(data.frame(adjustment = "true", model = c("conditional", "marginal"), anchored = NA, estimate = c(true_conditional_AB, true_marginal_AB), variance = var_theo_AB))
   return(rectangle_results)
 }
 
 n_iter = 2000
 
-# pb <- progress::progress_bar$new(total = n_iter)
 time_start <- Sys.time()
 results_simulations <- parallel::mclapply(1:n_iter, \(i) {
-  # pb$tick()
   time_start_iteration <- Sys.time()
   result_comparison <- comparison(pop_init, struct_results, N_RCT, N_BOOT_ITER)
   time_eluded <- Sys.time() - time_start_iteration

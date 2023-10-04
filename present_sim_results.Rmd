@@ -1,0 +1,282 @@
+---
+title: "PAIC simulation results"
+output: pdf_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r, warning=FALSE, include=FALSE}
+library(data.table)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(ggthemr)
+library(patchwork)
+library(data.table)
+ggthemr::ggthemr("pale")
+results_simulations <- readRDS("results_simulations_sacha_5/results_simulations.RDS")
+
+```
+
+
+# Overview of the problem
+
+The goal is to estimate the relative effect of treatment $A$ vs $B$, noted $\Delta_{t}$. These two treatments have been evaluated in two distinct trials, $AB$ and $AC$. The target estimand is the relative effect of $A$ vs $B$ in the source population of trial $AC$, written $\Delta_{t(AC)}$. 
+
+$\Delta_{t (AB)}$ will be estimated using different estimators: 
+
+- Unadjusted: 
+  - Unanchored: naive model
+  - Anchored: difference of relative effects $A$ versus $C$ and $B$ versus $C$
+- Adjusted
+  - Adjusted using a multivariable outcome model (regression model), or univariable weighted outcome model (propensity score)
+    - Each of these models will be fitted using either Individual Patient Data (IPD) for both trials, or IPD for the trial $AB$ and AgD for trial $BC$: Population-Adjusted Indirect Comparisons (PAIC). PAIC multivariable outcome model = Simulated Treatment Comparison (STC), univariable weighted outcome model = Matching-Adjusted Indirect Comparisons (MAIC).
+    - Each of these models will be either anchored or unanchored.
+
+
+## (Current) scenario settings 
+
+- Sample size per treatment arm = 100
+
+- One gaussian outcome $Y$
+
+- Treatment effects: 
+ 
+  - $\beta_A = 1.5$  
+  
+  - $\beta_B = 1$  
+  
+  - $\beta_C = 0$(*no effect, ~ placebo*)
+
+- One binary confounding factor $X_1$, following a binomial distribution $B(X_1)\sim 0.5$ in an overarching population from which patients of trials $AB$ and $AC$ have been sampled. Effects of this confounding factor on 1. trial assignment and 2. the outcome $Y$:
+
+  1. Constant effect on the outcome (prognostic): $\beta_{Y_{X1}} = 1.5$, and effect on the outcome through interaction with treatment $A$ (interaction): $\beta_{Y_{A:X1}} = 1.2$
+  
+  2. Effect on trial assignment ($\beta_{AC, X1} = 2$) and ($\beta_{BC, X1} = 0$)
+  
+- Outcome model : $$Y \sim \left(\beta_{Y_{X_1:A}}A + \beta_{Y_{X1}}\right)X1 + \beta_{Y_A}A + \beta_{Y_B}B + \beta_{Y_C}C + \epsilon_Y$$
+
+with $\epsilon_Y \sim N(0, 1)$
+
+- Trial assignment model : $P(Z=AC) \sim g \left(\beta_{AC, X1} X_1 \right)$ with $g(X) = \left(1 + exp(-X)\right)^{-1}$
+
+```{r, echo = TRUE, eval = FALSE}
+
+prop_X1 <- 0.5
+bT_X1 <- 2
+
+bY_X1 <- 1.5
+bYA_X1 <- 1.2
+
+bY_A <- 1.5
+bY_B <- 1.5
+bY_C <- 0
+
+N_RCT <- 200
+
+trial_assignment_model_AC <- bquote(X1 * bT_X1)
+trial_assignment_model_BC <- bquote(0) 
+outcome_model <- bquote(bYA_X1*X1*A + bY_X1*X1 + bY_A*A + bY_B*B + bY_C*C)
+
+```
+
+## Monte-Carlo simulations settings
+
+Two thousands iteration of that scenario, and estimation of variance of treatment effects via bootstrap (1000 iterations).
+
+```{r Generating the overarching population, echo = TRUE, eval = FALSE}
+library(data.table)
+N_pop <- 10^6
+
+pop_init <- data.table(
+  id = 1:N_pop,
+  X1 = rbinom(N_pop, 1, prop_X1)
+)
+
+trial_assignement_prob <- function(df, trial_assignment_model, deviates = FALSE) {
+  predicted <- with(df, eval(trial_assignment_model))
+  # variance of a logistic function is set ((s^2\pi^2)/3), with s=1 when using normal law -->
+  # making an assumption about bias and residual heterogeneity
+  return(plogis(predicted))
+}
+
+predict_outcome <- function(df, outcome_model, deviates = FALSE) {
+  predicted <- with(df, eval(outcome_model))
+  if (deviates) return(predicted + rnorm(n = length(predicted), mean = 0, sd = 1)) else return(predicted)
+}
+
+pop_init$prob_AC <- trial_assignement_prob(pop_init, trial_assignment_model_AC)
+pop_init$prob_BC <- trial_assignement_prob(pop_init, trial_assignment_model_BC)
+
+
+pop_init$Y_theo_A <- pop_init[, c("A", "B", "C") := .(1L, 0L, 0L)] |>
+  predict_outcome(outcome_model)
+pop_init$Y_theo_B <- pop_init[, c("A", "B", "C") := .(0L, 1L, 0L)] |>
+  predict_outcome(outcome_model)
+pop_init$Y_theo_C <- pop_init[, c("A", "B", "C") := .(0L, 0L, 1L)] |>
+  predict_outcome(outcome_model)
+pop_init[, c("A", "B", "C") := NULL]
+
+pop_init$prob_AC <- trial_assignement_prob(pop_init, trial_assignment_model_AC)
+pop_init$prob_BC <- trial_assignement_prob(pop_init, trial_assignment_model_BC)
+
+ttt_names <- c("A", "B", "C")
+cols_obs <- paste0("Y_obs_", ttt_names)
+cols_theo <- paste0("Y_theo_", ttt_names)
+# Assigning "observed" values for all the individual in the population, ie theoretical outcome + gaussian noise
+pop_init[, eval(bquote(cols_obs)) := lapply(.SD, \(x) x + rnorm(n = length(x))), .SD = cols_theo]
+```
+
+
+```{r Sampling trials, echo = TRUE, eval = FALSE}
+trial_AC <- pop_init[
+  sample(pop_init$id, N_RCT, replace = FALSE, prob = pop_init$prob_AC), 
+  .(id, ttt = factor(rep_len(c("A", "C"), length.out = N_RCT), levels = c("C", "A", "B")))][
+    pop_init_long[,c("id", "X1", "ttt", "prob_AC", "theo", "obs")], on = .(id, ttt), nomatch = NULL
+  ]
+trial_BC <- pop_init[
+  sample(pop_init$id, N_RCT, replace = FALSE, prob = pop_init$prob_BC),
+  .(id, ttt = factor(rep_len(c("B", "C"), length.out = N_RCT), levels = c("C","A", "B")))][
+    pop_init_long[,c("id", "X1", "ttt", "prob_BC", "theo", "obs")], on = .(id, ttt), nomatch = NULL
+  ]
+
+```
+
+
+# Simulation results 
+
+```{r}
+results_simulations <- readRDS("results_simulations_sacha_5/results_simulations.RDS")
+```
+
+
+```{r}
+long_results <- bind_rows(results_simulations, .id = "n_iter") |>
+  mutate(data = ifelse(model %in% c("maic", "stc"),
+                       "PAIC",
+                       ifelse(
+                         model %in% c("ml", "glm"),
+                         "IPD",
+                         ifelse(
+                           model == "unadjusted", "AgD", NA)
+                         )
+                       ),
+         data = factor(data, levels = c("AgD", "PAIC", "IPD")),
+         anchored = factor(anchored, levels = c("unanchored", "anchored")),
+         adjustment = ifelse(adjustment == "iptw", "IPTW", stringr::str_to_title(adjustment)),
+         across(c(model, anchored), .fns = stringr::str_to_title)) |>
+  rename_with(stringr::str_to_title)
+
+
+true_conditional <- long_results |>
+  filter(Adjustment == "True" & Model == "Conditional") |>
+  distinct(Estimate) |>
+  pull(Estimate)
+true_marginal <- long_results |>
+  filter(Adjustment == "True" & Model == "Marginal") |>
+  distinct(Estimate) |>
+  pull(Estimate)
+
+df_true_effects <- data.frame(Adjustment = c("Unadjusted", "Regression", "IPTW"),
+                              true = c(true_conditional, true_conditional, true_marginal))
+```
+
+
+## Distribution of the estimate 
+
+```{r}
+# Variation of the Estimate
+long_results |>
+  filter(Adjustment != "True") |>
+  ggplot(aes(x = Estimate, y = Adjustment, color = Data, fill = Data)) +
+  geom_violin(alpha = 0.8) +
+  facet_wrap(~Anchored) +
+  geom_vline(aes(xintercept = true_conditional, linetype = type),
+             show.legend = TRUE,
+             data = data.frame(effect = true_conditional, type = "dashed")) +
+  scale_linetype_manual(values = c("dashed"), labels = c(str_wrap("True conditional effect", width = 10))) +
+  labs(y = NULL,
+       title = "Treatment effect estimates")
+```
+
+# Standard error of the estimate
+
+```{r}
+long_results |>
+  filter(Adjustment != "True") |>
+  ggplot(aes(x = Variance, y = Adjustment, color = Data, fill = Data)) +
+  geom_violin(alpha = 0.8) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  facet_wrap(~Anchored) +
+  labs(y = NULL,
+       x = "Standard error of the estimate",
+       title = str_to_title("Treatment effect estimate standard error"))
+
+```
+
+# Performance of the estimators
+
+```{r }
+
+# Long indicators
+get_bias <- function(obs, theo) {
+  mean(obs - theo, na.rm = FALSE)
+}
+get_RMSE <- function(obs, theo) {
+  sqrt(mean((obs - theo)**2, na.rm = FALSE))
+}
+get_VR <- function(obs, se_obs) {
+  mean(se_obs, na.rm = FALSE) / sd(obs, na.rm = FALSE)
+}
+get_cov_95 <- function(coef, se, theo) {
+  ub <- coef + qnorm(0.975)*se
+  lb <- coef - qnorm(0.975)*se
+  covered <- theo < ub & theo > lb
+  mean(covered, na.rm = FALSE)
+}
+
+df_stats <- long_results |> filter(Adjustment != "True") |>
+  left_join(df_true_effects, by = "Adjustment") |>
+  group_by(Adjustment, Model, Anchored, Data) |>
+  summarize(bias = get_bias(Estimate, true),
+            rmse = get_RMSE(Estimate, true),
+            vr = get_VR(Estimate, sqrt(Variance)),
+            cov_95 = get_cov_95(Estimate, sqrt(Variance), true), 
+            .groups = "drop") |>
+  pivot_longer(cols = c("bias", "rmse", "vr", "cov_95"),
+               names_to = "indicator", values_to = "values")
+
+
+bias_plot <- ggplot(filter(df_stats, indicator == "bias"),
+                    aes(x = values, color = Data, shape = Anchored)) +
+  geom_point(aes(y = Adjustment), position = "jitter", size = 3) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  labs(title = "Bias")
+rmse_plot <- ggplot(filter(df_stats, indicator == "rmse"),
+                    aes(x = values, color = Data, shape = Anchored)) +
+  geom_point(aes(y = Adjustment), position = "jitter", size = 3) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  labs(title = "RMSE")
+vr_plot <- ggplot(filter(df_stats, indicator == "vr"),
+                    aes(x = values, color = Data, shape = Anchored)) +
+  geom_point(aes(y = Adjustment), position = "jitter", size = 3) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  labs(title = "VR")
+ci_plot <- ggplot(filter(df_stats, indicator == "cov_95"),
+                    aes(x = values, color = Data, shape = Anchored)) +
+  geom_point(aes(y = Adjustment), position = "jitter", size = 3) +
+  geom_vline(xintercept = 0.95, linetype = "dashed") +
+  labs(title = "95% coverage")
+
+bias_plot + rmse_plot + vr_plot + ci_plot +
+  plot_annotation(title = "Performance of the estimators") +
+  plot_layout(guides = "collect") &
+  theme(legend.position = 'bottom',
+        legend.box = "vertical",
+        axis.title = element_blank())
+```
+

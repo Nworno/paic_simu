@@ -1,31 +1,67 @@
 library(tidyr)
 library(dplyr)
 library(ggplot2)
+library(stringr)
 library(ggthemr)
+library(patchwork)
+library(data.table)
 ggthemr::ggthemr("pale")
-results_simulations <- readRDS("results_simulations_sacha_3/results_simulations.RDS")
+results_simulations <- readRDS("results_simulations_sacha_5/results_simulations.RDS")
 
-long_results <- data.table::rbindlist(results_simulations, idcol ="n_iter")[
-  , data := ifelse(model %in% c("maic", "stc"),
-                  "PAIC",
-                  ifelse(model %in% c("ml", "glm"),
+long_results <- bind_rows(results_simulations, .id = "n_iter") |>
+  mutate(data = ifelse(model %in% c("maic", "stc"),
+                       "PAIC",
+                       ifelse(
+                         model %in% c("ml", "glm"),
                          "IPD",
-                         ifelse(model == "unadjusted", "AgD", NA)))]
+                         ifelse(
+                           model == "unadjusted", "AgD", NA)
+                         )
+                       ),
+         data = factor(data, levels = c("AgD", "PAIC", "IPD")),
+         anchored = factor(anchored, levels = c("unanchored", "anchored")),
+         adjustment = ifelse(adjustment == "iptw", "IPTW", stringr::str_to_title(adjustment)),
+         across(c(model, anchored), .fns = stringr::str_to_title)) |>
+  rename_with(stringr::str_to_title)
 
-true_conditional <- long_results[name == "true" & model == "conditional", unique(estimate)]
-true_marginal <- long_results[name == "true" & model == "marginal", unique(estimate)]
 
-df_true_effects <- data.frame(name = c("unadjusted", "regression", "iptw"), true = c(true_conditional, true_conditional, true_marginal)) |> data.table::as.data.table()
+true_conditional <- long_results |>
+  filter(Adjustment == "True" & Model == "Conditional") |>
+  distinct(Estimate) |>
+  pull(Estimate)
+true_marginal <- long_results |>
+  filter(Adjustment == "True" & Model == "Marginal") |>
+  distinct(Estimate) |>
+  pull(Estimate)
+
+df_true_effects <- data.frame(Adjustment = c("Unadjusted", "Regression", "IPTW"),
+                              true = c(true_conditional, true_conditional, true_marginal))
 
 
-# Long results overall
+# Variation of the Estimate
 long_results |>
-  filter(name != "true") |>
-  ggplot(aes(x = estimate, y = name, color = data, fill = data)) +
-  # geom_point(position = "jitter") +
+  filter(Adjustment != "True") |>
+  ggplot(aes(x = Estimate, y = Adjustment, color = Data, fill = Data)) +
+  geom_violin(alpha = 0.8) +
+  facet_wrap(~Anchored) +
+  geom_vline(aes(xintercept = true_conditional, linetype = type),
+             show.legend = TRUE,
+             data = data.frame(effect = true_conditional, type = "dashed")) +
+  scale_linetype_manual(values = c("dashed"), labels = c(str_wrap("True conditional effect", width = 10))) +
+  labs(y = NULL,
+       title = "Treatment effect estimates")
+
+# Variance
+long_results |>
+  filter(Adjustment != "True") |>
+  ggplot(aes(x = Variance, y = Adjustment, color = Data, fill = Data)) +
   geom_violin() +
-  facet_wrap(~anchored) +
-  geom_vline(xintercept = true_conditional, linetype = "dashed")
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  facet_wrap(~Anchored) +
+  labs(y = NULL,
+       x = "Standard error of the estimate",
+       title = str_to_title("Treatment effect estimate standard error"))
+
 
 # Long indicators
 get_bias <- function(obs, theo) {
@@ -34,7 +70,7 @@ get_bias <- function(obs, theo) {
 get_RMSE <- function(obs, theo) {
   sqrt(mean((obs - theo)**2, na.rm = FALSE))
 }
-get_RV <- function(obs, se_obs) {
+get_VR <- function(obs, se_obs) {
   mean(se_obs, na.rm = FALSE) / sd(obs, na.rm = FALSE)
 }
 get_cov_95 <- function(coef, se, theo) {
@@ -44,20 +80,43 @@ get_cov_95 <- function(coef, se, theo) {
   mean(covered, na.rm = FALSE)
 }
 
-df_stats <- df_true_effects[long_results[name != "true"], on = "name"][, .(bias = get_bias(estimate, true),
-                                                                           rmse = get_RMSE(estimate, true),
-                                                                           rv = get_RV(estimate, sqrt(variance)),
-                                                                           cov_95 = get_cov_95(estimate, sqrt(variance), true)),
-                                                                       by = .(name, model, anchored, data)] |>
-  tidyr::pivot_longer(cols = c("bias", "rmse", "rv", "cov_95"),
-                      names_to = "indicator", values_to = "values")
+df_stats <- long_results |> filter(Adjustment != "True") |>
+  left_join(df_true_effects, by = "Adjustment") |>
+  group_by(Adjustment, Model, Anchored, Data) |>
+  summarize(bias = get_bias(Estimate, true),
+            rmse = get_RMSE(Estimate, true),
+            vr = get_VR(Estimate, sqrt(Variance)),
+            cov_95 = get_cov_95(Estimate, sqrt(Variance), true)) |>
+  pivot_longer(cols = c("bias", "rmse", "vr", "cov_95"),
+               names_to = "indicator", values_to = "values")
 
-df_stats |> ggplot(aes(x = values, color = data, shape = anchored)) +
-  geom_point(aes(y = "test"), position = "jitter", size =3) +
-  # geom_vline(aes(xintercept = intercept),
-  #            data = data.frame(indicator = c("bias", "cov_95", "rmse", "rv"),
-  #                              intercept = c(0, 0.95, 0, 1)),
-  #            linetype = "dashed") +
-  facet_grid(cols = vars(indicator), rows = vars(name), scales = "free", shrink = TRUE)
+
+bias_plot <- ggplot(filter(df_stats, indicator == "bias"),
+                    aes(x = values, color = Data, shape = Anchored)) +
+  geom_point(aes(y = Adjustment), position = "jitter", size = 3) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  labs(title = "Bias")
+rmse_plot <- ggplot(filter(df_stats, indicator == "rmse"),
+                    aes(x = values, color = Data, shape = Anchored)) +
+  geom_point(aes(y = Adjustment), position = "jitter", size = 3) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  labs(title = "RMSE")
+vr_plot <- ggplot(filter(df_stats, indicator == "vr"),
+                    aes(x = values, color = Data, shape = Anchored)) +
+  geom_point(aes(y = Adjustment), position = "jitter", size = 3) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  labs(title = "VR")
+ci_plot <- ggplot(filter(df_stats, indicator == "cov_95"),
+                    aes(x = values, color = Data, shape = Anchored)) +
+  geom_point(aes(y = Adjustment), position = "jitter", size = 3) +
+  geom_vline(xintercept = 0.95, linetype = "dashed") +
+  labs(title = "95% coverage")
+
+bias_plot + rmse_plot + vr_plot + ci_plot +
+  plot_annotation(title = "Performance of the estimators") +
+  plot_layout(guides = "collect") &
+  theme(legend.position = 'bottom',
+        legend.box = "vertical",
+        axis.title = element_blank())
 
 
