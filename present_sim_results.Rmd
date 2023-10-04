@@ -216,10 +216,12 @@ long_results |>
 
 ```
 
+
+\newpage
+
 # Performance of the estimators
 
 ```{r }
-
 # Long indicators
 get_bias <- function(obs, theo) {
   mean(obs - theo, na.rm = FALSE)
@@ -247,8 +249,26 @@ df_stats <- long_results |> filter(Adjustment != "True") |>
             .groups = "drop") |>
   pivot_longer(cols = c("bias", "rmse", "vr", "cov_95"),
                names_to = "indicator", values_to = "values")
+```
 
 
+```{r}
+df_stats |> 
+  select(indicator, everything()) |> 
+  mutate(Model = ifelse(Model == "Unadjusted", "Unadjusted", toupper(Model)),
+         indicator = case_match(indicator, 
+                                "bias" ~ "Bias", 
+                                "rmse" ~ "RMSE", 
+                                "vr" ~ "VR", 
+                                "cov_95" ~ "Cov 95"), 
+         values = format(round(values, 3), digits = 3, nsmall = 3, justify = "right")
+  ) |> 
+  arrange(indicator, desc(Adjustment), Data, desc(Anchored)) |> 
+  knitr::kable()
+```
+
+
+```{r }
 bias_plot <- ggplot(filter(df_stats, indicator == "bias"),
                     aes(x = values, color = Data, shape = Anchored)) +
   geom_point(aes(y = Adjustment), position = "jitter", size = 3) +
