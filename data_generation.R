@@ -22,6 +22,22 @@ N_BOOT_ITER <- 1000
 ##################
 names_covariates <- c("X1")
 
+## Note David: we could have
+## one binary variable X1
+## one continuous variable X2
+## one parameter to switch the binary variable between prognostic only (bYA_X1 = 0) or effect modifier (bYA_X1 != 0)
+## one parameter to switch the continuous variable between prognostic only (bYA_X2 = 0) or effect modifier (bYA_X2 != 0)
+## one parameter to switch the continuous variable distribution: normal (symmetrical) or lognormal (asymmetrical)
+## Overall, 8 scenarios here
+## 
+## Then, run all estimators. For estimators taking into accounts covariates, run three estimations: 
+## - only X1
+## - only X2
+## - both X1 and X2
+## For estimators taking into accounts moments, run with (to be discussed):
+## - first moment only
+## - first and second moments 
+
 trial_assignment_model_AC <- bquote(X1 * bT_X1) ## Note David: logit of the probability of being included in the AC trial
 trial_assignment_model_BC <- bquote(0) # required that prob of trial assignment independent of baseline characteristics of overarching population for the ATT to represent the marginal effect in the initial (overall) population # Note David: logit of the probability of being included in the BC trial
 ## Note David: The value for BC trial doesn't matter here, as long as it is the same for all individuals, ensuring that the prevalence of X1 in the BC trial will be the same as the source population
