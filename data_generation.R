@@ -45,9 +45,23 @@ list_simulation_parameters <- list(
 ######### Models
 ##################
 names_covariates <- c("X1")
-
-trial_assignment_model_AC <- bquote(X1 * bT_X1 + X2 * bT_X2 + X3 * bT_X3 + bT_X4)
-trial_assignment_model_BC <- bquote(0) # required that prob of trial assignment independent of baseline characteristics of overarching population for the ATT to represent the marginal effect in the initial (overall) population
+## Note David: we could have
+## one binary variable X1
+## one continuous variable X2
+## one parameter to switch the binary variable between prognostic only (bYA_X1 = 0) or effect modifier (bYA_X1 != 0)
+## one parameter to switch the continuous variable between prognostic only (bYA_X2 = 0) or effect modifier (bYA_X2 != 0)
+## one parameter to switch the continuous variable distribution: normal (symmetrical) or lognormal (asymmetrical)
+## Overall, 8 scenarios here
+##
+## Then, run all estimators. For estimators taking into accounts covariates, run three estimations:
+## - only X1
+## - only X2
+## - both X1 and X2
+## For estimators taking into accounts moments, run with (to be discussed):
+## - first moment only
+## - first and second moments
+trial_assignment_model_AC <- bquote(X1 * bT_X1 + X2 * bT_X2 + X3 * bT_X3 + bT_X4) ## Note David: logit of the probability of being included in the AC trial
+trial_assignment_model_BC <- bquote(0) ## Note David: The value for BC trial doesn't matter here, as long as it is the same for all individuals, ensuring that the prevalence of X1 in the BC trial will be the same as the source population
 outcome_model_1 <- bquote(bY_A_X1*X1*A + bY_X1*X1 + bY_A*A + bY_B*B + bY_C*C)
 outcome_model_2 <- bquote(bY_X1*X1 + bY_X2 * X2 + (bY_A + bY_A_X1*X1) * A + bY_B*B + bY_C*C)
 outcome_model_3 <- bquote(bY_X1*X1 + bY_X2 * X2 + bY_X3 * X3 + bY_X4 * X4 + (bY_A + bY_A_X1*X1) * A + bY_B*B + bY_C*C)
@@ -81,7 +95,8 @@ predict_outcome <- function(df, outcome_model, deviates = FALSE) {
 }
 
 pop_init$prob_AC <- trial_assignement_prob(pop_init, trial_assignment_model_AC)
-pop_init$prob_BC <- trial_assignement_prob(pop_init, trial_assignment_model_BC)
+## Note David: theoretical prevalence of X1 in the AC trial: prop_X1*plogis(bT_X1)/(prop_X1*plogis(bT_X1) + (1-prop_X1)*plogis(0))
+pop_init$prob_BC <- trial_assignement_prob(pop_init, trial_assignment_model_BC) ## Note David: theoretical prevalence of X1 in the BC trial: prop_X1*plogis(0)/(prop_X1*plogis(0) + (1-prop_X1)*plogis(0))
 
 
 pop_init$Y_theo_A <- pop_init[, c("A", "B", "C") := .(1L, 0L, 0L)] |>
@@ -440,11 +455,13 @@ comparison <- function(pop_init, struct_results, N_RCT, N_BOOT_ITER) {
   # Could do all the draws at once, and transform to long df with bind_rows, and then do one massive join
   trial_AC <- pop_init[
     sample(pop_init$id, N_RCT, replace = FALSE, prob = pop_init$prob_AC), # use integer based indexing
+    ## Note David: individuals with X1 = 1 have a higher probability of being included, according to `trial_assignment_model_AC`
     .(id, ttt = factor(rep_len(c("A", "C"), length.out = N_RCT), levels = c("C", "A", "B")))][
       pop_init_long[,c("id", "X1", "ttt", "prob_AC", "theo", "obs")], on = .(id, ttt), nomatch = NULL
     ]
   trial_BC <- pop_init[
     sample(pop_init$id, N_RCT, replace = FALSE, prob = pop_init$prob_BC), # use integer based indexing
+    ## Note David: all individuals have the same probability of being included, according to `trial_assignment_model_BC`
     .(id, ttt = factor(rep_len(c("B", "C"), length.out = N_RCT), levels = c("C","A", "B")))][
       pop_init_long[,c("id", "X1", "ttt", "prob_BC", "theo", "obs")], on = .(id, ttt), nomatch = NULL]
 
