@@ -6,10 +6,18 @@ options(mc.cores = 110)
 N_pop <- 10^6
 
 prop_X1 <- 0.5
-bT_X1 <- 2
+bT_X1 <- 0.5
+bT_X2 <- 0.2
+bT_X3 <- -0.5
+bT_X4 <- 0.3
 
 bY_X1 <- 1.5
-bYA_X1 <- 1.2
+bY_X2 <- -0.5
+bY_X3 <- 0.5
+bY_X4 <- 2
+
+bY_A_X1 <- 1.2
+bY_A_X4 <- 0.2
 
 bY_A <- 1.5
 bY_B <- 1.5
@@ -18,21 +26,45 @@ bY_C <- 0
 N_RCT <- 200
 N_BOOT_ITER <- 1000
 
+list_simulation_parameters <- list(
+  N_pop = N_pop,
+  prop_X1 = prop_X1,
+  bT_X1 = bT_X1,
+  bY_X1 = bY_X1,
+  bYA_X1 = bYA_X1,
+  bY_A = bY_A,
+  bY_B = bY_B,
+  bY_C = bY_C,
+  N_RCT = N_RCT,
+  N_BOOT_ITER = N_BOOT_ITER,
+  names_covariates = names_covariates,
+  trial_assignment_model_AC = trial_assignment_model_AC,
+  trial_assignment_model_BC = trial_assignment_model_BC,
+  outcome_model = outcome_model
+)
 ######### Models
 ##################
 names_covariates <- c("X1")
 
-trial_assignment_model_AC <- bquote(X1 * bT_X1)
+trial_assignment_model_AC <- bquote(X1 * bT_X1 + X2 * bT_X2 + X3 * bT_X3 + bT_X4)
 trial_assignment_model_BC <- bquote(0) # required that prob of trial assignment independent of baseline characteristics of overarching population for the ATT to represent the marginal effect in the initial (overall) population
-outcome_model <- bquote(bYA_X1*X1*A + bY_X1*X1 + bY_A*A + bY_B*B + bY_C*C)
+outcome_model_1 <- bquote(bY_A_X1*X1*A + bY_X1*X1 + bY_A*A + bY_B*B + bY_C*C)
+outcome_model_2 <- bquote(bY_X1*X1 + bY_X2 * X2 + (bY_A + bY_A_X1*X1) * A + bY_B*B + bY_C*C)
+outcome_model_3 <- bquote(bY_X1*X1 + bY_X2 * X2 + bY_X3 * X3 + bY_X4 * X4 + (bY_A + bY_A_X1*X1) * A + bY_B*B + bY_C*C)
+outcome_model_4 <- bquote(bY_X1*X1 + bY_X2 * X2 + bY_X3 * X3 + bY_X4 * X4 + (bY_A + bY_A_X4*X4) * A + bY_B*B + bY_C*C)
 
 ##############################################
 ########### Creating an overarching population
 ##############################################
-pop_init <- data.table(
+pop_init <- tibble::tibble(
   id = 1:N_pop,
-  X1 = rbinom(N_pop, 1, prop_X1)
+  X1 = rbinom(N_pop, 1, prop_X1),
+  X2 = rnorm(N_pop, 0, 1),
+  X3 = rlnorm(N_pop, 0, 1),
+  binary_marker = rbinom(N_pop, 1, prop_X1),
+  X4 = binary_marker * rnorm(N_pop, -1, 1) + (1 - binary_marker) * rnorm(N_pop, 1, 1)
 ) |>
+  as.data.table() |>
   setkey("id")
 
 
@@ -63,7 +95,10 @@ pop_init[, c("A", "B", "C") := NULL]
 ttt_names <- c("A", "B", "C")
 cols_obs <- paste0("Y_obs_", ttt_names)
 cols_theo <- paste0("Y_theo_", ttt_names)
+
+# TODO: reprendre d'ici, assigner traitement théorique en fonction du modèle de l'outcome choisi
 # Assigning "observed" values for all the individual in the population
+pop_init[, eval(bquote(cols_obs)) := lapply(.SD, \(x) x + rnorm(n = length(x))), .SD = cols_theo]
 pop_init[, eval(bquote(cols_obs)) := lapply(.SD, \(x) x + rnorm(n = length(x))), .SD = cols_theo]
 # equivalent
 # pop_init[, sub("theo", "obs", cols_theo, fixed = TRUE) := lapply(.SD, \(x) x + rnorm(n = length(x))), .SD = cols_theo]
@@ -471,7 +506,7 @@ comparison <- function(pop_init, struct_results, N_RCT, N_BOOT_ITER) {
   return(rectangle_results)
 }
 
-n_iter = 2000
+n_iter = 1
 
 time_start <- Sys.time()
 results_simulations <- parallel::mclapply(1:n_iter, \(i) {
