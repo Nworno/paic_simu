@@ -35,6 +35,19 @@ $\Delta_{t (AB)}$ will be estimated using different estimators:
     - Each of these models will be fitted using either Individual Patient Data (IPD) for both trials, or IPD for the trial $AB$ and AgD for trial $BC$: Population-Adjusted Indirect Comparisons (PAIC). PAIC multivariable outcome model = Simulated Treatment Comparison (STC), univariable weighted outcome model = Matching-Adjusted Indirect Comparisons (MAIC).
     - Each of these models will be either anchored or unanchored.
 
+## Summary of the estimators
+
+|Estimand|Common comparator?|Full IPD?|Estimator|
+|--------|------------------|---------|---------|
+|Marginal|Yes|Yes|NMA with IPTW PS|
+|Marginal|No|Yes|IPTW PS|
+|Marginal|Yes|No|Anchored MAIC|
+|Marginal|No|No|Unanchored MAIC|
+|Conditional|Yes|Yes|IPD NMA|
+|Conditional|No|Yes|Regression-based outcome model|
+|Conditional|Yes|No|Anchored STC|
+|Conditional|No|No|Unanchored STC|
+
 
 ## (Current) scenario settings 
 
@@ -149,6 +162,10 @@ trial_BC <- pop_init[
 
 ```{r}
 results_simulations <- readRDS("results_simulations/results_simulations.RDS")
+results_simulations_1 <- readRDS("C:/Users/aserret-larmande/git_repos/paic_simu/results_simulations/20231019_102445/experiment_1.RDS")
+results_simulations_2 <- readRDS("C:/Users/aserret-larmande/git_repos/paic_simu/results_simulations/20231019_102445/experiment_2.RDS")
+results_simulations_3 <- readRDS("C:/Users/aserret-larmande/git_repos/paic_simu/results_simulations/20231019_102445/experiment_3.RDS")
+results_simulations_4 <- readRDS("C:/Users/aserret-larmande/git_repos/paic_simu/results_simulations/20231019_102445/experiment_4.RDS")
 ```
 
 
