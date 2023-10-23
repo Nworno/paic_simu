@@ -161,29 +161,44 @@ trial_BC <- pop_init[
 # Simulation results 
 
 ```{r}
-results_simulations <- readRDS("results_simulations/results_simulations.RDS")
-results_simulations_1 <- readRDS("C:/Users/aserret-larmande/git_repos/paic_simu/results_simulations/20231019_102445/experiment_1.RDS")
-results_simulations_2 <- readRDS("C:/Users/aserret-larmande/git_repos/paic_simu/results_simulations/20231019_102445/experiment_2.RDS")
-results_simulations_3 <- readRDS("C:/Users/aserret-larmande/git_repos/paic_simu/results_simulations/20231019_102445/experiment_3.RDS")
-results_simulations_4 <- readRDS("C:/Users/aserret-larmande/git_repos/paic_simu/results_simulations/20231019_102445/experiment_4.RDS")
+dir_experience_results <- "results_simulations/20231023_144509"
+
+list_files <- lapply(list.dirs(dir_experience_results, full.names = TRUE), \(x) {
+  list.files(x, full.names = TRUE, pattern = "^experiment.*\\.RDS") 
+}) |> Filter(f = \(x) length(x) != 0)
+nested_list_results_df <- rapply(list_files, classes = "character", how = "replace", \(x) {
+  sapply(x, readRDS, simplify = FALSE)
+})
+long_df_results <- lapply(nested_list_results_df, \(l) lapply(l, rbindlist, idcol = "iteration")) |> 
+  lapply(rbindlist, idcol = "estimator_num") |> 
+  rbindlist(idcol = "population_parameters_num")
+long_df_results[, estimator_num := gsub(pattern = ".*(?<=\\/)(\\d+)(?=\\/).*", replacement = "\\1", x = estimator_num, perl = TRUE)]
 ```
 
 
 ```{r}
-long_results <- bind_rows(results_simulations, .id = "n_iter") |>
-  mutate(data = ifelse(model %in% c("maic", "stc"),
-                       "PAIC",
-                       ifelse(
-                         model %in% c("ml", "glm"),
-                         "IPD",
-                         ifelse(
-                           model == "unadjusted", "AgD", NA)
-                         )
-                       ),
-         data = factor(data, levels = c("AgD", "PAIC", "IPD")),
-         anchored = factor(anchored, levels = c("unanchored", "anchored")),
+df_population_parameters <- readRDS(file = file.path(dir_experience_results, "df_population_parameters.RDS"))
+df_estimators_parameters <- readRDS(file = file.path(dir_experience_results, "df_estimators_parameters.RDS"))
+
+df_true_effects <- list.dirs(dir_experience_results) |>
+  lapply(list.files, pattern = "average_outcome_df", full.names = TRUE) |> 
+  Filter(f = \(x) length(x) != 0) |> 
+  lapply(readRDS) |> 
+  rbindlist(idcol = "population_parameters_num")
+
+```
+
+
+
+```{r}
+long_results <- long_df_results |> 
+  mutate(data = case_match(model, 
+                           c("maic", "stc") ~ "PAIC", 
+                           c("ml", "glm") ~ "IPD", 
+                           "unadjusted" ~ "AgD") |> factor(levels = c("AgD", "PAIC", "IPD")), 
+         anchored = factor(anchored, levels = c("unanchored", "anchored")) |> stringr::str_to_title(),
          adjustment = ifelse(adjustment == "iptw", "IPTW", stringr::str_to_title(adjustment)),
-         across(c(model, anchored), .fns = stringr::str_to_title)) |>
+         model = ifelse(model == "unadjuted", "Unadjusted", toupper(model))) |> 
   rename_with(stringr::str_to_title)
 
 
@@ -205,8 +220,8 @@ df_true_effects <- data.frame(Adjustment = c("Unadjusted", "Regression", "IPTW")
 
 ```{r}
 # Variation of the Estimate
-long_results |>
-  filter(Adjustment != "True") |>
+long_df_results |>
+  filter(adjustment != "True") |>
   ggplot(aes(x = Estimate, y = Adjustment, color = Data, fill = Data)) +
   geom_violin(alpha = 0.8) +
   facet_wrap(~Anchored) +

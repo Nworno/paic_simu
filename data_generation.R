@@ -14,11 +14,12 @@ df_population_parameters <- list(
   bT_X3 = -0.5,
   bT_X4 = 0.3,
   bY_X1 = 1.5,
-  bY_X2 = 0,
-  bY_X3 = 0.5,
-  bY_X4 = -0.5,
+  bY_X2 = 0.5,
+  bY_X3 = 0,
+  bY_X4 = 0,
   bY_A_X1 = c(0, 1.2),
   bY_A_X4 = c(0, 0.2),
+  f_X1 = c(bquote(rbinom(N_pop, 1, 0.5))),
   f_X2 = c(bquote(rnorm(N_pop, 0.5, 1)), bquote(rlnorm(N_pop, 0.5, 0.5))),
   bY_A = 1.5,
   bY_B = 1.5,
@@ -56,10 +57,10 @@ df_population_parameters[, population_parameters_num := 1:.N]
 
 creating_population <- function(list_simulation_parameters) {
   attach(list_simulation_parameters)
-  binary_marker <- rbinom(N_pop, 1, prop_X1)
+  binary_marker <- rbinom(N_pop, 1, 0.5)
   pop_init <- data.table(
     id = 1:N_pop,
-    X1 = rbinom(N_pop, 1, prop_X1),
+    X1 = eval(f_X1),
     X2 = eval(f_X2),
     X3 = rlnorm(N_pop, 0.5, 0.5),
     X4 = binary_marker * rnorm(N_pop, -1.5, 1) + (1 - binary_marker) * rnorm(N_pop, 1.5, 1)
@@ -79,59 +80,35 @@ creating_population <- function(list_simulation_parameters) {
   pop_init[, prob_w_trial_AC := trial_assignement_prob(AC_trial_model, df = pop_init)]
   pop_init[, prob_w_trial_BC := trial_assignement_prob(BC_trial_model, df = pop_init)]
 
-  theoretical_outcomes_A <- lapply(list(outcome_generation_formula),
-                                   predict_outcome,
-                                   df = pop_init[, c("A", "B", "C") := .(1L, 0L, 0L)]) |>
-    setNames(1:length(list(outcome_generation_formula))) |>
-    c("ttt" = "A", "id" = list(1:nrow(pop_init))) |>
+  covariate_names <- c("X1", "X2", "X3", "X4")
+  df_outcomes <- sapply(list(A = pop_init[, .(A = 1L, B = 0L, C = 0L, (.SD)), .SDcols = covariate_names],
+                             B = pop_init[, .(A = 0L, B = 1L, C = 0L, (.SD)), .SDcols = covariate_names],
+                             C = pop_init[, .(A = 0L, B = 0L, C = 1L, (.SD)), .SDcols = covariate_names]),
+                        predict_outcome,
+                        outcome_model = outcome_generation_formula,
+                        simplify = FALSE) |>
+    c("id" = list(1:nrow(pop_init))) |>
     as.data.table() |>
-    melt(id.vars = c("id", "ttt"), variable.name = "outcome_model", value.name = "Y_theo")
-  theoretical_outcomes_B <- lapply(list(outcome_generation_formula),
-                                   predict_outcome,
-                                   df = pop_init[, c("A", "B", "C") := .(0L, 1L, 0L)]) |>
-    setNames(1:length(list(outcome_generation_formula))) |>
-    c("ttt" = "B", "id" = list(1:nrow(pop_init))) |>
-    as.data.table() |>
-    melt(id.vars = c("id", "ttt"), variable.name = "outcome_model", value.name = "Y_theo")
-  theoretical_outcomes_C <- lapply(list(outcome_generation_formula),
-                                   predict_outcome,
-                                   df = pop_init[, c("A", "B", "C") := .(0L, 0L, 1L)]) |>
-    setNames(1:length(list(outcome_generation_formula))) |>
-    c("ttt" = "C", "id" = list(1:nrow(pop_init))) |>
-    as.data.table() |>
-    melt(id.vars = c("id", "ttt"), variable.name = "outcome_model", value.name = "Y_theo")
-
-  pop_init[, c("A", "B", "C") := NULL]
-  df_outcomes <- rbindlist(list(theoretical_outcomes_A, theoretical_outcomes_B, theoretical_outcomes_C)) |>
-    setkey("id")
+    melt(id.vars = c("id"), variable.name = "ttt", value.name = "Y_theo")
   df_outcomes[, Y_obs := Y_theo + rnorm(n = length(Y_theo), mean = 0, sd = 1)]
 
-  average_pop_init <- pop_init[, lapply(.SD, mean), .SDcols = c("X1", "X2", "X3", "X4")]
+  average_pop_init <- pop_init[, lapply(.SD, mean), .SDcols = covariate_names]
 
-
-  average_conditional_outcome_A <- sapply(list(outcome_generation_formula),
-                                          predict_outcome,
-                                          average_pop_init[,c("A", "B", "C") := .(1L, 0L, 0L)])
-  average_conditional_outcome_B <- sapply(list(outcome_generation_formula),
-                                          predict_outcome,
-                                          average_pop_init[,c("A", "B", "C") := .(0L, 1L, 0L)])
-  average_conditional_outcome_C <- sapply(list(outcome_generation_formula),
-                                          predict_outcome,
-                                          average_pop_init[,c("A", "B", "C") := .(0L, 0L, 1L)])
-  average_conditional_outcome <- data.frame("A" = average_conditional_outcome_A,
-                                            "B" = average_conditional_outcome_B,
-                                            "C" = average_conditional_outcome_C,
-                                            "outcome_model" = 1:length(list(outcome_generation_formula))) |>
+  average_conditional_outcome <- sapply(list("A" = average_pop_init[, .(A = 1L, B = 0L, C = 0L, (.SD)), .SDcols = covariate_names],
+                                             "B" = average_pop_init[, .(A = 0L, B = 1L, C = 0L, (.SD)), .SDcols = covariate_names],
+                                             "C" = average_pop_init[, .(A = 0L, B = 0L, C = 1L, (.SD)), .SDcols = covariate_names]),
+                                        predict_outcome,
+                                        outcome_model = outcome_generation_formula,
+                                        simplify = FALSE) |>
     as.data.table() |>
     melt(measure.vars = c("A", "B", "C"), variable.name = "ttt", value.name = "outcome")
-  marginal_outcome <- df_outcomes[, .(outcome = mean(Y_obs)), by = c("ttt", "outcome_model")]
-
+  marginal_outcome <- df_outcomes[, .(outcome = mean(Y_obs)), by = c("ttt")]
   average_outcome_df <- rbindlist(
     list("conditional" = average_conditional_outcome,
          "marginal" = marginal_outcome),
     use.names = TRUE,
     idcol = "outcome_type") |>
-    dcast(outcome_type + outcome_model ~ ttt, value.var = "outcome")
+    dcast(outcome_type ~ ttt, value.var = "outcome")
   average_outcome_df[, AB := A - B]
 
   return(list(
@@ -156,13 +133,13 @@ indirect_comparisons <- function(pop_init,
   selected_individuals_AC <- pop_init[sample(id, N_RCT, replace = FALSE, prob = prob_w_trial_AC)][
     , ttt := rep_len(c("A", "C"), length.out = .N)]
   selected_outcomes_AC <- df_outcomes[selected_individuals_AC, on = c("id", "ttt")][
-    , c("id", "ttt", "outcome_model", "Y_obs")]
+    , c("id", "ttt", "Y_obs")]
   trial_AC <- pop_init[selected_outcomes_AC, on = "id"][, ttt := factor(ttt, levels = c("C", "A"))]
 
   selected_individuals_BC <- pop_init[sample(id, N_RCT, replace = FALSE, prob = prob_w_trial_BC)][
       , ttt := rep_len(c("B", "C"), length.out = .N)]
   selected_outcomes_BC <- df_outcomes[selected_individuals_BC, on = c("id", "ttt")][
-    , c("id", "ttt", "outcome_model", "Y_obs")]
+    , c("id", "ttt", "Y_obs")]
   trial_BC <- pop_init[selected_outcomes_BC, on = "id"][, ttt := factor(ttt, levels = c("C", "B"))]
 
   average_trial_BC_covariates <- trial_BC[, lapply(.SD, mean), .SDcols = covariate_names]
@@ -307,7 +284,7 @@ for (row_population in 1:nrow(df_population_parameters)) {
   df_outcomes <- population$df_outcomes
   average_outcome_df <- population$average_outcome_df
 
-  saveRDS(average_outcome_df, file.path(experiment_results_directory, "average_outcome_df.RDS"))
+  saveRDS(average_outcome_df, file.path(dir_sub_experiment, "average_outcome_df.RDS"))
   for (row_estimators in 1:nrow(df_estimators_parameters)) {
     list_estimators_parameters <- df_estimators_parameters[row_estimators, ] |> unlist(recursive = FALSE)
     results_simulations <- parallel::mclapply(1:n_iter, \(i) {
@@ -327,5 +304,5 @@ for (row_population in 1:nrow(df_population_parameters)) {
                                                   paste0("experiment_", row_estimators, ".RDS")))
   }
 }
-  cat("Simulation length ", Sys.time() - time_start, "seconds \n")
+cat("Simulation length ", Sys.time() - time_start, "seconds \n")
 
