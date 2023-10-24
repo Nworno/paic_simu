@@ -161,7 +161,7 @@ trial_BC <- pop_init[
 # Simulation results 
 
 ```{r}
-dir_experience_results <- "results_simulations/20231023_144509"
+dir_experience_results <- "results_simulations/20231024_095835"
 
 list_files <- lapply(list.dirs(dir_experience_results, full.names = TRUE), \(x) {
   list.files(x, full.names = TRUE, pattern = "^experiment.*\\.RDS") 
@@ -177,7 +177,8 @@ long_df_results[, estimator_num := gsub(pattern = ".*(?<=\\/)(\\d+)(?=\\/).*", r
 
 
 ```{r}
-df_population_parameters <- readRDS(file = file.path(dir_experience_results, "df_population_parameters.RDS"))
+df_population_parameters <- readRDS(file = file.path(dir_experience_results, "df_population_parameters.RDS")) |> 
+  dplyr::mutate(across(where(is.list), as.character))
 df_estimators_parameters <- readRDS(file = file.path(dir_experience_results, "df_estimators_parameters.RDS"))
 
 df_true_effects <- list.dirs(dir_experience_results) |>
@@ -188,31 +189,52 @@ df_true_effects <- list.dirs(dir_experience_results) |>
 
 ```
 
+```{r}
+# Naming scenarios
+
+#TODO: reprendre d'ici 
+prognostic <- df_population_parameters[, .SD, .SDcols = grep("bY_X", names(df_population_parameters), value = TRUE)][
+  , lapply(.SD, \(x) x != 0)] |> 
+  rename_with(\(x) sub("bY_", "", x)) |> 
+  mutate(population_parameters_num = 1:n()) |> 
+  pivot_longer(-population_parameters_num, names_to = "variable") |> 
+  filter(value)
+
+  # mutate(across(everything(), ifelse(x == TRUE, "oui", "")))
+TEM <- df_population_parameters[, .SD, .SDcols = grep("bY_A_X", names(df_population_parameters), value = TRUE)][
+  , lapply(.SD, \(x) x != 0)] |> 
+  rename_with(\(x) sub("bY_A_", "", x)) |> 
+  mutate(population_parameters_num = 1:n()) |> 
+  pivot_longer(-population_parameters_num, names_to = "variable") |> 
+  filter(value)
+
+normal_distribution <- df_population_parameters[, .SD, .SDcols = grep("f_X", names(df_population_parameters), value = TRUE)][
+  , lapply(.SD, \(x) x != 0)]
+
+df_estimators_parameters[, c("covariate_names", "outcome_regression_model")][
+  , .(covariate_names, outcome_regression_model = stringr::str_extract_all(outcome_regression_model, "X\\d"))][
+    .(covariate_names, )
+  ]
+  mutate(outcome_regression_model =)
+```
 
 
 ```{r}
-long_results <- long_df_results |> 
+
+long_df_results <- long_df_results |> 
   mutate(data = case_match(model, 
                            c("maic", "stc") ~ "PAIC", 
                            c("ml", "glm") ~ "IPD", 
                            "unadjusted" ~ "AgD") |> factor(levels = c("AgD", "PAIC", "IPD")), 
+         outcome_type = case_match(adjustment, 
+                                   c("unadjusted", "iptw") ~ "marginal", 
+                                   "regression" ~ "conditional"),
          anchored = factor(anchored, levels = c("unanchored", "anchored")) |> stringr::str_to_title(),
          adjustment = ifelse(adjustment == "iptw", "IPTW", stringr::str_to_title(adjustment)),
-         model = ifelse(model == "unadjuted", "Unadjusted", toupper(model))) |> 
-  rename_with(stringr::str_to_title)
+         model = ifelse(model == "unadjusted", "Unadjusted", toupper(model))) 
 
+joined_results <- df_true_effects[, .(population_parameters_num, outcome_type, true_effect = AB)][long_df_results, , on = c("population_parameters_num", "outcome_type")] |> rename_with(stringr::str_to_title)
 
-true_conditional <- long_results |>
-  filter(Adjustment == "True" & Model == "Conditional") |>
-  distinct(Estimate) |>
-  pull(Estimate)
-true_marginal <- long_results |>
-  filter(Adjustment == "True" & Model == "Marginal") |>
-  distinct(Estimate) |>
-  pull(Estimate)
-
-df_true_effects <- data.frame(Adjustment = c("Unadjusted", "Regression", "IPTW"),
-                              true = c(true_conditional, true_conditional, true_marginal))
 ```
 
 
@@ -220,15 +242,15 @@ df_true_effects <- data.frame(Adjustment = c("Unadjusted", "Regression", "IPTW")
 
 ```{r}
 # Variation of the Estimate
-long_df_results |>
-  filter(adjustment != "True") |>
+joined_results |>
   ggplot(aes(x = Estimate, y = Adjustment, color = Data, fill = Data)) +
   geom_violin(alpha = 0.8) +
-  facet_wrap(~Anchored) +
-  geom_vline(aes(xintercept = true_conditional, linetype = type),
-             show.legend = TRUE,
-             data = data.frame(effect = true_conditional, type = "dashed")) +
-  scale_linetype_manual(values = c("dashed"), labels = c(str_wrap("True conditional effect", width = 10))) +
+  geom_jitter(alpha = 0.8) +
+  # facet_wrap(~Anchored) +
+  geom_vline(aes(xintercept = True_effect, linetype = Outcome_type),
+             show.legend = TRUE) +
+  facet_wrap( ~ Population_parameters_num) +
+  # scale_linetype_manual(values = c("dashed"), labels = c(str_wrap("True conditional effect", width = 10))) +
   labs(y = NULL,
        title = "Treatment effect estimates")
 ```
@@ -236,12 +258,11 @@ long_df_results |>
 # Standard error of the estimate
 
 ```{r}
-long_results |>
-  filter(Adjustment != "True") |>
+joined_results |>
   ggplot(aes(x = Variance, y = Adjustment, color = Data, fill = Data)) +
   geom_violin(alpha = 0.8) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
-  facet_wrap(~Anchored) +
+  facet_wrap(~Anchored, nrow = 2) +
   labs(y = NULL,
        x = "Standard error of the estimate",
        title = str_to_title("Treatment effect estimate standard error"))
@@ -271,13 +292,12 @@ get_cov_95 <- function(coef, se, theo) {
   mean(covered, na.rm = FALSE)
 }
 
-df_stats <- long_results |> filter(Adjustment != "True") |>
-  left_join(df_true_effects, by = "Adjustment") |>
+df_stats <- joined_results |>
   group_by(Adjustment, Model, Anchored, Data) |>
-  summarize(bias = get_bias(Estimate, true),
-            rmse = get_RMSE(Estimate, true),
+  summarize(bias = get_bias(Estimate, True_effect ),
+            rmse = get_RMSE(Estimate, True_effect ),
             vr = get_VR(Estimate, sqrt(Variance)),
-            cov_95 = get_cov_95(Estimate, sqrt(Variance), true), 
+            cov_95 = get_cov_95(Estimate, sqrt(Variance), True_effect ), 
             .groups = "drop") |>
   pivot_longer(cols = c("bias", "rmse", "vr", "cov_95"),
                names_to = "indicator", values_to = "values")

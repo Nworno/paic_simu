@@ -3,7 +3,7 @@ library(data.table)
 options(mc.cores = 1)
 source("estimators.R")
 N_pop <- 10^6
-N_BOOT_ITER <- 500
+N_BOOT_ITER <- 2
 # Parameters
 ####################
 
@@ -11,23 +11,25 @@ df_population_parameters <- list(
   prop_X1 = 0.5,
   bT_X1 = 0.5,
   bT_X2 = 0.2,
-  bT_X3 = -0.5,
-  bT_X4 = 0.3,
+  bT_X3 = 0,
+  bT_X4 = 0,
   bY_X1 = 1.5,
   bY_X2 = 0.5,
   bY_X3 = 0,
   bY_X4 = 0,
   bY_A_X1 = c(0, 1.2),
-  bY_A_X4 = c(0, 0.2),
+  bY_A_X2 = c(0, 0.2),
   f_X1 = c(bquote(rbinom(N_pop, 1, 0.5))),
   f_X2 = c(bquote(rnorm(N_pop, 0.5, 1)), bquote(rlnorm(N_pop, 0.5, 0.5))),
+  f_X3 = c(bquote(0)),
+  f_X4 = c(bquote(0)),
   bY_A = 1.5,
   bY_B = 1.5,
   bY_C = 0,
   AC_trial_model = c(bquote(X1 * bT_X1 + X2 * bT_X2)),
   BC_trial_model = c(bquote(0)),
   outcome_generation_formula = c(
-  bquote(bY_X1*X1 + (bY_A + bY_A_X1*X1) * A + bY_X2 * X2 + bY_X3 * X3 + bY_X4 * X4 + (bY_A + bY_A_X4*X4) * A + bY_B*B + bY_C*C))) |>
+  bquote(bY_X1*X1 + bY_X2 * X2 + bY_X3 * X3 + bY_X4 * X4 + (bY_A + bY_A_X1*X1 + bY_A_X2*X2) * A +  bY_B*B + bY_C*C))) |>
   expand.grid() |>
   as.data.table()
 df_population_parameters[, population_parameters_num := 1:.N]
@@ -268,9 +270,10 @@ df_estimators_parameters[, estimator_num := 1:.N]
 ###############
 ### SIMULATIONS
 ###############
-n_iter = 1000
+n_iter = 3
 time_start <- Sys.time()
 time_start_string <- format(time_start, "%Y%m%d_%H%M%S")
+print(time_start_string)
 experiment_results_directory <- file.path("results_simulations", time_start_string)
 if (!dir.exists(experiment_results_directory)) dir.create(experiment_results_directory)
 saveRDS(df_population_parameters, file.path(experiment_results_directory, "df_population_parameters.RDS"))
@@ -304,5 +307,6 @@ for (row_population in 1:nrow(df_population_parameters)) {
                                                   paste0("experiment_", row_estimators, ".RDS")))
   }
 }
-cat("Simulation length ", Sys.time() - time_start, "seconds \n")
+cat("Simulation length: ")
+print(Sys.time() - time_start)
 
