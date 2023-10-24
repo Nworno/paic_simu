@@ -161,82 +161,8 @@ trial_BC <- pop_init[
 # Simulation results 
 
 ```{r}
-dir_experience_results <- "results_simulations/20231024_095835"
-
-list_files <- lapply(list.dirs(dir_experience_results, full.names = TRUE), \(x) {
-  list.files(x, full.names = TRUE, pattern = "^experiment.*\\.RDS") 
-}) |> Filter(f = \(x) length(x) != 0)
-nested_list_results_df <- rapply(list_files, classes = "character", how = "replace", \(x) {
-  sapply(x, readRDS, simplify = FALSE)
-})
-long_df_results <- lapply(nested_list_results_df, \(l) lapply(l, rbindlist, idcol = "iteration")) |> 
-  lapply(rbindlist, idcol = "estimator_num") |> 
-  rbindlist(idcol = "population_parameters_num")
-long_df_results[, estimator_num := gsub(pattern = ".*(?<=\\/)(\\d+)(?=\\/).*", replacement = "\\1", x = estimator_num, perl = TRUE)]
+source("processing_results.R")
 ```
-
-
-```{r}
-df_population_parameters <- readRDS(file = file.path(dir_experience_results, "df_population_parameters.RDS")) |> 
-  dplyr::mutate(across(where(is.list), as.character))
-df_estimators_parameters <- readRDS(file = file.path(dir_experience_results, "df_estimators_parameters.RDS"))
-
-df_true_effects <- list.dirs(dir_experience_results) |>
-  lapply(list.files, pattern = "average_outcome_df", full.names = TRUE) |> 
-  Filter(f = \(x) length(x) != 0) |> 
-  lapply(readRDS) |> 
-  rbindlist(idcol = "population_parameters_num")
-
-```
-
-```{r}
-# Naming scenarios
-
-#TODO: reprendre d'ici 
-prognostic <- df_population_parameters[, .SD, .SDcols = grep("bY_X", names(df_population_parameters), value = TRUE)][
-  , lapply(.SD, \(x) x != 0)] |> 
-  rename_with(\(x) sub("bY_", "", x)) |> 
-  mutate(population_parameters_num = 1:n()) |> 
-  pivot_longer(-population_parameters_num, names_to = "variable") |> 
-  filter(value)
-
-  # mutate(across(everything(), ifelse(x == TRUE, "oui", "")))
-TEM <- df_population_parameters[, .SD, .SDcols = grep("bY_A_X", names(df_population_parameters), value = TRUE)][
-  , lapply(.SD, \(x) x != 0)] |> 
-  rename_with(\(x) sub("bY_A_", "", x)) |> 
-  mutate(population_parameters_num = 1:n()) |> 
-  pivot_longer(-population_parameters_num, names_to = "variable") |> 
-  filter(value)
-
-normal_distribution <- df_population_parameters[, .SD, .SDcols = grep("f_X", names(df_population_parameters), value = TRUE)][
-  , lapply(.SD, \(x) x != 0)]
-
-df_estimators_parameters[, c("covariate_names", "outcome_regression_model")][
-  , .(covariate_names, outcome_regression_model = stringr::str_extract_all(outcome_regression_model, "X\\d"))][
-    .(covariate_names, )
-  ]
-  mutate(outcome_regression_model =)
-```
-
-
-```{r}
-
-long_df_results <- long_df_results |> 
-  mutate(data = case_match(model, 
-                           c("maic", "stc") ~ "PAIC", 
-                           c("ml", "glm") ~ "IPD", 
-                           "unadjusted" ~ "AgD") |> factor(levels = c("AgD", "PAIC", "IPD")), 
-         outcome_type = case_match(adjustment, 
-                                   c("unadjusted", "iptw") ~ "marginal", 
-                                   "regression" ~ "conditional"),
-         anchored = factor(anchored, levels = c("unanchored", "anchored")) |> stringr::str_to_title(),
-         adjustment = ifelse(adjustment == "iptw", "IPTW", stringr::str_to_title(adjustment)),
-         model = ifelse(model == "unadjusted", "Unadjusted", toupper(model))) 
-
-joined_results <- df_true_effects[, .(population_parameters_num, outcome_type, true_effect = AB)][long_df_results, , on = c("population_parameters_num", "outcome_type")] |> rename_with(stringr::str_to_title)
-
-```
-
 
 ## Distribution of the estimate 
 
@@ -245,7 +171,7 @@ joined_results <- df_true_effects[, .(population_parameters_num, outcome_type, t
 joined_results |>
   ggplot(aes(x = Estimate, y = Adjustment, color = Data, fill = Data)) +
   geom_violin(alpha = 0.8) +
-  geom_jitter(alpha = 0.8) +
+  # geom_jitter(alpha = 0.8) +
   # facet_wrap(~Anchored) +
   geom_vline(aes(xintercept = True_effect, linetype = Outcome_type),
              show.legend = TRUE) +
