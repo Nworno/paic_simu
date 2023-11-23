@@ -9,14 +9,15 @@ knitr::opts_chunk$set(echo = FALSE)
 ```
 
 ```{r, warning=FALSE, include=FALSE}
-library(data.table)
 library(ggplot2)
+library(data.table)
 library(dplyr)
 library(tidyr)
 library(stringr)
 library(ggthemr)
 library(patchwork)
 library(data.table)
+library(ggrepel)
 ggthemr::ggthemr("pale")
 ```
 
@@ -49,146 +50,67 @@ $\Delta_{t (AB)}$ will be estimated using different estimators:
 |Conditional|No|No|Unanchored STC|
 
 
-## (Current) scenario settings 
 
-- Sample size per treatment arm = 100
-
-- One gaussian outcome $Y$
-
-- Treatment effects: 
- 
-  - $\beta_A = 1.5$  
-  
-  - $\beta_B = 1$  
-  
-  - $\beta_C = 0$(*no effect, ~ placebo*)
-
-- One binary confounding factor $X_1$, following a binomial distribution $B(X_1)\sim 0.5$ in an overarching population from which patients of trials $AB$ and $AC$ have been sampled. Effects of this confounding factor on 1. trial assignment and 2. the outcome $Y$:
-
-  1. Constant effect on the outcome (prognostic): $\beta_{Y_{X1}} = 1.5$, and effect on the outcome through interaction with treatment $A$ (interaction): $\beta_{Y_{A:X1}} = 1.2$
-  
-  2. Effect on trial assignment ($\beta_{AC, X1} = 2$) and ($\beta_{BC, X1} = 0$)
-  
-- Outcome model : $$Y \sim \left(\beta_{Y_{X_1:A}}A + \beta_{Y_{X1}}\right)X1 + \beta_{Y_A}A + \beta_{Y_B}B + \beta_{Y_C}C + \epsilon_Y$$
-
-with $\epsilon_Y \sim N(0, 1)$
-
-- Trial assignment model : $P(Z=AC) \sim g \left(\beta_{AC, X1} X_1 \right)$ with $g(X) = \left(1 + exp(-X)\right)^{-1}$
-
-```{r, echo = TRUE, eval = FALSE}
-
-prop_X1 <- 0.5
-bT_X1 <- 2
-
-bY_X1 <- 1.5
-bYA_X1 <- 1.2
-
-bY_A <- 1.5
-bY_B <- 1.5
-bY_C <- 0
-
-N_RCT <- 200
-
-trial_assignment_model_AC <- bquote(X1 * bT_X1)
-trial_assignment_model_BC <- bquote(0) 
-outcome_model <- bquote(bYA_X1*X1*A + bY_X1*X1 + bY_A*A + bY_B*B + bY_C*C)
-
-```
-
-## Monte-Carlo simulations settings
-
-Two thousands iteration of that scenario, and estimation of variance of treatment effects via bootstrap (1000 iterations).
-
-```{r Generating the overarching population, echo = TRUE, eval = FALSE}
-library(data.table)
-N_pop <- 10^6
-
-pop_init <- data.table(
-  id = 1:N_pop,
-  X1 = rbinom(N_pop, 1, prop_X1)
-)
-
-trial_assignement_prob <- function(df, trial_assignment_model, deviates = FALSE) {
-  predicted <- with(df, eval(trial_assignment_model))
-  # variance of a logistic function is set ((s^2\pi^2)/3), with s=1 when using normal law -->
-  # making an assumption about bias and residual heterogeneity
-  return(plogis(predicted))
-}
-
-predict_outcome <- function(df, outcome_model, deviates = FALSE) {
-  predicted <- with(df, eval(outcome_model))
-  if (deviates) return(predicted + rnorm(n = length(predicted), mean = 0, sd = 1)) else return(predicted)
-}
-
-pop_init$prob_AC <- trial_assignement_prob(pop_init, trial_assignment_model_AC)
-pop_init$prob_BC <- trial_assignement_prob(pop_init, trial_assignment_model_BC)
-
-
-pop_init$Y_theo_A <- pop_init[, c("A", "B", "C") := .(1L, 0L, 0L)] |>
-  predict_outcome(outcome_model)
-pop_init$Y_theo_B <- pop_init[, c("A", "B", "C") := .(0L, 1L, 0L)] |>
-  predict_outcome(outcome_model)
-pop_init$Y_theo_C <- pop_init[, c("A", "B", "C") := .(0L, 0L, 1L)] |>
-  predict_outcome(outcome_model)
-pop_init[, c("A", "B", "C") := NULL]
-
-pop_init$prob_AC <- trial_assignement_prob(pop_init, trial_assignment_model_AC)
-pop_init$prob_BC <- trial_assignement_prob(pop_init, trial_assignment_model_BC)
-
-ttt_names <- c("A", "B", "C")
-cols_obs <- paste0("Y_obs_", ttt_names)
-cols_theo <- paste0("Y_theo_", ttt_names)
-# Assigning "observed" values for all the individual in the population, ie theoretical outcome + gaussian noise
-pop_init[, eval(bquote(cols_obs)) := lapply(.SD, \(x) x + rnorm(n = length(x))), .SD = cols_theo]
-```
-
-
-```{r Sampling trials, echo = TRUE, eval = FALSE}
-trial_AC <- pop_init[
-  sample(pop_init$id, N_RCT, replace = FALSE, prob = pop_init$prob_AC), 
-  .(id, ttt = factor(rep_len(c("A", "C"), length.out = N_RCT), levels = c("C", "A", "B")))][
-    pop_init_long[,c("id", "X1", "ttt", "prob_AC", "theo", "obs")], on = .(id, ttt), nomatch = NULL
-  ]
-trial_BC <- pop_init[
-  sample(pop_init$id, N_RCT, replace = FALSE, prob = pop_init$prob_BC),
-  .(id, ttt = factor(rep_len(c("B", "C"), length.out = N_RCT), levels = c("C","A", "B")))][
-    pop_init_long[,c("id", "X1", "ttt", "prob_BC", "theo", "obs")], on = .(id, ttt), nomatch = NULL
-  ]
-
-```
-
-
-# Simulation results 
-
-```{r}
+```{r, include=FALSE, warning=FALSE}
 source("processing_results.R")
 ```
 
-## Distribution of the estimate 
+\newpage
+
+# Parameters of the different scenarios
+
+- `covariate_names`: Covariates included in the propensity score model
+- `outcome_regression_model`: Outcome model used in regression-based estimators
+- `model_marginal`: Is the marginal model (propensity score) adequate? Or is it missing variables (confounded), or including non confounding factors variables (imprecise)?
+- `model_conditional`: Is the outcome regression model adequate? Or is it missing confoundings, or including non confounding variables?
+- `any_nonnormal`: Are at least one of the PF/TEM non-normally distributed?
 
 ```{r}
+classification_scenario |> 
+  select(c(covariate_names, outcome_regression_model, model_marginal, model_conditional, any_nonnormal)) |> 
+  mutate(scenario_num = 1:n()) |> 
+  select(scenario_num, everything()) |> 
+  knitr::kable(caption = "Parameters of different scenarios") |> 
+  kableExtra::kable_styling(latex_options = c("scale_down", "hold_position"), 
+                            position = "center")
+```
+
+
+
+Data Generation Model : 
+
+$$Y = \beta_{Y_{X1}} \times X_1 + \beta_{Y_{X2}} \times X_2 + (\beta_{Y_A} + \beta_{Y_{A,X1}} \times X_1 + \beta_{Y_{A,X2}} \times X_2) * A + \beta_{Y_B} \times B + \beta_{Y_C} \times C + \epsilon$$
+With $\epsilon \sim N(0, 1)$
+
+
+<!-- ## Distribution of the estimate  -->
+
+```{r, eval=FALSE}
 # Variation of the Estimate
 joined_results |>
   ggplot(aes(x = Estimate, y = Adjustment, color = Data, fill = Data)) +
-  geom_violin(alpha = 0.8) +
-  # geom_jitter(alpha = 0.8) +
-  # facet_wrap(~Anchored) +
-  geom_vline(aes(xintercept = True_effect, linetype = Outcome_type),
-             show.legend = TRUE) +
-  facet_wrap( ~ Population_parameters_num) +
-  # scale_linetype_manual(values = c("dashed"), labels = c(str_wrap("True conditional effect", width = 10))) +
-  labs(y = NULL,
-       title = "Treatment effect estimates")
+  geom_violin(alpha = 0.8) +  # geom_jitter(alpha = 0.8) +
+  facet_grid(Population_parameters_num ~ Estimator_num, scales = "free") +
+  theme(legend.position = "bottom")
+# +
+#   theme_void() +
+#   theme(strip.text = element_blank())
+  # geom_vline(aes(xintercept = True_effect, linetype = Outcome_type),
+  #            show.legend = TRUE) +
+  # facet_wrap( ~ Population_parameters_num) +
+  # # scale_linetype_manual(values = c("dashed"), labels = c(str_wrap("True conditional effect", width = 10))) +
+  # labs(y = NULL,
+  #      title = "Treatment effect estimates")
 ```
 
-# Standard error of the estimate
+<!-- # Standard error of the estimate -->
 
-```{r}
+```{r, eval=FALSE}
 joined_results |>
   ggplot(aes(x = Variance, y = Adjustment, color = Data, fill = Data)) +
   geom_violin(alpha = 0.8) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
-  facet_wrap(~Anchored, nrow = 2) +
+  facet_grid(Population_parameters_num ~ Estimator_num, scales = "free") +
   labs(y = NULL,
        x = "Standard error of the estimate",
        title = str_to_title("Treatment effect estimate standard error"))
@@ -218,61 +140,152 @@ get_cov_95 <- function(coef, se, theo) {
   mean(covered, na.rm = FALSE)
 }
 
+correct_decision <- function(coef, se, theo) {
+  ub <- coef + qnorm(0.975)*se
+  lb <- coef - qnorm(0.975)*se
+  contains_0 <- ub >= 0 & lb <= 0
+  sign_estimate_theo_identical <- (theo >= 0 & coef >= 0) | (theo <= 0 & coef <= 0)
+  theo_is_null <- theo == 0
+  correct_decision <- ifelse(theo_is_null, contains_0, sign_estimate_theo_identical)
+  mean(correct_decision, na.rm = FALSE)
+}
+
+
 df_stats <- joined_results |>
-  group_by(Adjustment, Model, Anchored, Data) |>
+  group_by(Population_parameters_num, Estimator_num, Adjustment, Model, Anchored, Data) |>
   summarize(bias = get_bias(Estimate, True_effect ),
             rmse = get_RMSE(Estimate, True_effect ),
             vr = get_VR(Estimate, sqrt(Variance)),
             cov_95 = get_cov_95(Estimate, sqrt(Variance), True_effect ), 
+            correct_decision = correct_decision(Estimate, Variance, True_effect),
             .groups = "drop") |>
-  pivot_longer(cols = c("bias", "rmse", "vr", "cov_95"),
-               names_to = "indicator", values_to = "values")
+  pivot_longer(cols = c("bias", "rmse", "vr", "cov_95", "correct_decision"),
+               names_to = "indicator", values_to = "values") 
+```
+
+
+```{r, results='asis', fig.height = 7, fig.width = 6, warning = FALSE}
+vline_data <- data.frame(
+  value = c(0, 0, 1, 0.95), 
+  indicator = factor(c("Bias", "RMSE", "VR", "95% coverage"))
+)
+
+df_stats |> 
+  select(indicator, everything()) |> 
+  mutate(Model = ifelse(Model == "Unadjusted", "Unadjusted", toupper(Model)),
+         indicator = 
+           case_match(indicator, "bias" ~ "Bias", 
+                      "rmse" ~ "RMSE", 
+                      "vr" ~ "VR", 
+                      "cov_95" ~ "95% coverage") |> 
+           factor(levels = c("Bias", "RMSE", "VR", "95% coverage"))
+  ) |> 
+  group_by(Population_parameters_num, Estimator_num) |> 
+  group_walk(.f = \(df, df_param) {
+    cat(paste0("## Scenario number ", df_param$Estimator_num + (df_param$Population_parameters_num - 1) * 3))
+    cat("\n")
+    print(knitr::kable(left_join(df_param,
+                                 classification_scenario |> 
+                                   select(c(population_parameters_num, estimator_num, bY_X1, bY_X2, bY_A_X1, bY_A_X2, f_X1, f_X2, covariate_names, outcome_regression_model)) |>  
+                                   rename(regression = outcome_regression_model, 
+                                          PS_model = covariate_names),
+                                 by = c("Population_parameters_num" = "population_parameters_num", 
+                                        "Estimator_num" = "estimator_num")) |> 
+                         select(-Population_parameters_num, -Estimator_num), 
+                       booktabs = TRUE, 
+                       ) |> 
+            kableExtra::kable_styling(latex_options = c("scale_down", "hold_position"), 
+                                      position = "center")
+          )
+    print(df |> 
+            mutate(combined = factor(paste(Data, Anchored)), 
+                   annotation = ifelse(Model == "MAIC", "MAIC", ifelse(Model == "STC", "STC", NA_character_))) |> 
+            ggplot(aes(x = values, y = Adjustment, shape = combined, fill = Data, color = Data)) +
+            geom_jitter(height = 0.1, size = 3, stroke = 1.5) + 
+            facet_wrap("indicator", nrow = 4, scales = "free") +
+            scale_fill_manual(values = alpha(c("#de6757", "#eb9050", "#3262ab"), alpha = 0.5)) +
+            scale_color_manual(values = alpha(c("#de6757", "#eb9050", "#3262ab"))) +
+            scale_shape_manual(values = c(2, 1, 17, 16, 24, 21), guide = "none") +
+            geom_vline(aes(xintercept = value), linetype = "dashed", vline_data) +
+            geom_text_repel(aes(label = annotation),
+                            point.padding = 0.2, 
+                            box.padding = 0.3,
+                            segment.curvature = -1e-20,
+                            arrow = arrow(length = unit(0.015, "npc")), min.segment.length = 0, size = 3) +
+            labs(x = NULL, y = NULL) + 
+            theme(legend.position = "bottom"))
+    cat("\\newpage")
+    print(knitr::kable(df |>
+                         mutate(values = format(round(values, 3), digits = 3, nsmall = 3, justify = "right")) |>
+                         pivot_wider(names_from = indicator, values_from = values)) |> 
+            kableExtra::collapse_rows(columns = c(1, 2), latex_hline = "major", row_group_label_position = 'stack'))
+    cat("\\newpage")
+  })
+```
+
+```{r}
+knitr::knit_exit()
 ```
 
 
 ```{r}
-df_stats |> 
-  select(indicator, everything()) |> 
-  mutate(Model = ifelse(Model == "Unadjusted", "Unadjusted", toupper(Model)),
-         indicator = case_match(indicator, 
-                                "bias" ~ "Bias", 
-                                "rmse" ~ "RMSE", 
-                                "vr" ~ "VR", 
-                                "cov_95" ~ "Cov 95"), 
-         values = format(round(values, 3), digits = 3, nsmall = 3, justify = "right")
-  ) |> 
-  arrange(indicator, desc(Adjustment), Data, desc(Anchored)) |> 
-  knitr::kable()
+ggplot(df_stats, aes(x = values, color = Data, shape = Anchored)) +
+  geom_point(aes(y = Adjustment), position = "jitter", size = 2) +
+  geom_vline(aes(xintercept = value), linetype = "dashed", data = vline_data) +
+  facet_wrap(~ indicator, nrow = 2, scales = "free") +
+  theme(legend.position = "bottom")
 ```
 
 
 ```{r }
 bias_plot <- ggplot(filter(df_stats, indicator == "bias"),
                     aes(x = values, color = Data, shape = Anchored)) +
-  geom_point(aes(y = Adjustment), position = "jitter", size = 3) +
+  geom_point(aes(y = Adjustment), position = "jitter", size = 1) +
   geom_vline(xintercept = 0, linetype = "dashed") +
+  facet_grid(Population_parameters_num ~ Estimator_num) +
   labs(title = "Bias")
 rmse_plot <- ggplot(filter(df_stats, indicator == "rmse"),
                     aes(x = values, color = Data, shape = Anchored)) +
-  geom_point(aes(y = Adjustment), position = "jitter", size = 3) +
+  geom_point(aes(y = Adjustment), position = "jitter", size = 1) +
   geom_vline(xintercept = 0, linetype = "dashed") +
+  facet_grid(Population_parameters_num ~ Estimator_num) +
   labs(title = "RMSE")
 vr_plot <- ggplot(filter(df_stats, indicator == "vr"),
                     aes(x = values, color = Data, shape = Anchored)) +
-  geom_point(aes(y = Adjustment), position = "jitter", size = 3) +
+  geom_point(aes(y = Adjustment), position = "jitter", size = 1) +
   geom_vline(xintercept = 1, linetype = "dashed") +
+  facet_grid(Population_parameters_num ~ Estimator_num) +
   labs(title = "VR")
 ci_plot <- ggplot(filter(df_stats, indicator == "cov_95"),
                     aes(x = values, color = Data, shape = Anchored)) +
-  geom_point(aes(y = Adjustment), position = "jitter", size = 3) +
+  geom_point(aes(y = Adjustment), position = "jitter", size = 1) +
   geom_vline(xintercept = 0.95, linetype = "dashed") +
+  facet_grid(Population_parameters_num ~ Estimator_num) +
   labs(title = "95% coverage")
-
-bias_plot + rmse_plot + vr_plot + ci_plot +
-  plot_annotation(title = "Performance of the estimators") +
-  plot_layout(guides = "collect") &
-  theme(legend.position = 'bottom',
-        legend.box = "vertical",
-        axis.title = element_blank())
 ```
+
+```{r}
+bias_plot
+```
+
+```{r}
+rmse_plot
+```
+
+```{r}
+vr_plot
+```
+
+```{r}
+ci_plot
+```
+
+# ```{r }
+# bias_plot + rmse_plot + vr_plot + ci_plot +
+#   plot_annotation(title = "Performance of the estimators") +
+#   plot_layout(guides = "collect") &
+#   theme(legend.position = 'bottom',
+#         legend.box = "vertical",
+#         axis.title = element_blank())
+# ```
 
