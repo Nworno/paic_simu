@@ -113,6 +113,11 @@ creating_population <- function(list_simulation_parameters) {
     dcast(outcome_type ~ ttt, value.var = "outcome")
   average_outcome_df[, AB := A - B]
 
+  # Correcting theoretically correction marginal effect, so that it is set to 0 when there is actually
+  # no difference between theoretical conditional and marginal, as it should be
+  # Useful to quantify estimators alpha and beta risk level respect
+  if (average_outcome_df[outcome_type == "conditional", AB] == 0) average_outcome_df[, AB := 0]
+
   return(list(
     "pop_init" = pop_init,
     "df_outcomes" = df_outcomes,

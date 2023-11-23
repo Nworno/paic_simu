@@ -14,7 +14,7 @@ nested_list_results_df <- rapply(list_files, classes = "character", how = "repla
 long_df_results <- lapply(nested_list_results_df, \(l) lapply(l, rbindlist, idcol = "iteration")) |>
   lapply(rbindlist, idcol = "estimator_num") |>
   rbindlist(idcol = "population_parameters_num")
-long_df_results[, estimator_num := gsub(pattern = ".*(?<=\\/)(\\d+)(?=\\/).*", replacement = "\\1", x = estimator_num, perl = TRUE)]
+long_df_results[, estimator_num := gsub(pattern = ".*(?<=experiment_)(\\d+)(?=\\.RDS).*", replacement = "\\1", x = estimator_num, perl = TRUE)]
 
 
 df_true_effects <- list.dirs(dir_experience_results) |>
@@ -32,10 +32,13 @@ combined_parameters <- merge(df_population_parameters[, .((.SD), key = 1)],
                              all.x = TRUE,
                              allow.cartesian = TRUE)
 
+
 ########################
 # Aligning DGM and estimators models:
 # finding out which scenarios are biased and which are not
 ########################
+
+
 true_PF <- df_population_parameters |>
   select(population_parameters_num, matches("bY_X")) |>
   mutate(across(matches("bY_X"), \(x) x != 0)) |>
@@ -151,7 +154,9 @@ long_df_results <- long_df_results |>
          adjustment = ifelse(adjustment == "iptw", "IPTW", stringr::str_to_title(adjustment)),
          model = ifelse(model == "unadjusted", "Unadjusted", toupper(model)))
 
-joined_results <- df_true_effects[, .(population_parameters_num, outcome_type, true_effect = AB)][long_df_results, , on = c("population_parameters_num", "outcome_type")] |> rename_with(stringr::str_to_title)
+joined_results <- df_true_effects[, .(population_parameters_num, outcome_type, true_effect = AB)][long_df_results, , on = c("population_parameters_num", "outcome_type")] |>
+  mutate(across(c(population_parameters_num, estimator_num), as.integer)) |>
+  rename_with(stringr::str_to_title)
 
 
 classification_scenario <- left_join(combined_parameters,
