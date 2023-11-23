@@ -8,28 +8,28 @@ N_BOOT_ITER <- 2
 ####################
 
 df_population_parameters <- list(
-  prop_X1 = 0.5,
-  bT_X1 = 0.5,
-  bT_X2 = 0.2,
-  bT_X3 = 0,
-  bT_X4 = 0,
-  bY_X1 = 1.5,
-  bY_X2 = 0.5,
-  bY_X3 = 0,
-  bY_X4 = 0,
-  bY_A_X1 = c(0, 1.2),
-  bY_A_X2 = c(0, 0.2),
-  f_X1 = c(bquote(rbinom(N_pop, 1, 0.5))),
-  f_X2 = c(bquote(rnorm(N_pop, 0.5, 1)), bquote(rlnorm(N_pop, 0.5, 0.5))),
-  f_X3 = c(bquote(0)),
-  f_X4 = c(bquote(0)),
-  bY_A = 1.5,
-  bY_B = 1.5,
-  bY_C = 0,
-  AC_trial_model = c(bquote(X1 * bT_X1 + X2 * bT_X2)),
-  BC_trial_model = c(bquote(0)),
+  prop_X1 = 0.5, # Variable binaire, prevalence dans la population
+  bT_X1 = 0.5,   # Effet de la variable binaire sur la probabilité d'être dans l'essai AC
+  bT_X2 = 0.2,   # Effet de la variable continue X2...
+  bT_X3 = 0,     # Idem, mais inutile pour le moment
+  bT_X4 = 0,     # Idem, mais inutile pour le moment
+  bY_X1 = 1.5,   # Effet de X1 sur l'outcome
+  bY_X2 = 0.5,   # Effet de X2 sur l'outcome
+  bY_X3 = 0,     # Effet de X3 sur l'outcome (inutile pour le moment)
+  bY_X4 = 0,     # Effet de X4 sur l'outcome (inutile pour le moment)
+  bY_A_X1 = c(0, 1.2), # Interaction A et X1 dans le modèle outcome
+  bY_A_X2 = c(0, 0.2), # Interaction A et X2 dans le modèle outcome
+  f_X1 = c(bquote(rbinom(N_pop, 1, 0.5))), # distribution de X1 (revoir car il faudrait utiliser prop_X1)
+  f_X2 = c(bquote(rnorm(N_pop, 0.5, 1)), bquote(rlnorm(N_pop, 0.5, 0.5))), # distribution de X2
+  f_X3 = c(bquote(0)), # inutile pour le moment
+  f_X4 = c(bquote(0)), # inutile pour le moment
+  bY_A = 1.5,  # Effet de A par rapport à C
+  bY_B = 1.5,  # Effet de B par rapport à C
+  bY_C = 0,    # Pas d'effet de C sur l'outcome
+  AC_trial_model = c(bquote(X1 * bT_X1 + X2 * bT_X2)), # Modèle d'attribution de l'essai AC
+  BC_trial_model = c(bquote(0)),  # Modèle d'attribution de l'essai BC
   outcome_generation_formula = c(
-  bquote(bY_X1*X1 + bY_X2 * X2 + bY_X3 * X3 + bY_X4 * X4 + (bY_A + bY_A_X1*X1 + bY_A_X2*X2) * A +  bY_B*B + bY_C*C))) |>
+  bquote(bY_X1*X1 + bY_X2 * X2 + bY_X3 * X3 + bY_X4 * X4 + (bY_A + bY_A_X1*X1 + bY_A_X2*X2) * A +  bY_B*B + bY_C*C))) |> 
   expand.grid() |>
   as.data.table()
 df_population_parameters[, population_parameters_num := 1:.N]
@@ -57,6 +57,7 @@ df_population_parameters[, population_parameters_num := 1:.N]
 ########### Creating an overarching population
 ##############################################
 
+## Génère une data.frame de 10^6 ou 7 lignes
 creating_population <- function(list_simulation_parameters) {
   attach(list_simulation_parameters)
   binary_marker <- rbinom(N_pop, 1, 0.5)
@@ -65,7 +66,7 @@ creating_population <- function(list_simulation_parameters) {
     X1 = eval(f_X1),
     X2 = eval(f_X2),
     X3 = rlnorm(N_pop, 0.5, 0.5),
-    X4 = binary_marker * rnorm(N_pop, -1.5, 1) + (1 - binary_marker) * rnorm(N_pop, 1.5, 1)
+    X4 = binary_marker * rnorm(N_pop, -1.5, 1) + (1 - binary_marker) * rnorm(N_pop, 1.5, 1) # tentative d'une variable bimodale (mais pas utilisé finalement, coef à zéro)
   ) |>
     setkey("id")
 
@@ -120,13 +121,14 @@ creating_population <- function(list_simulation_parameters) {
   ))
 }
 
+# méthodes de comparaison indirecte
 indirect_comparisons <- function(pop_init,
                                  df_outcomes,
                                  struct_results,
                                  N_BOOT_ITER,
                                  N_RCT,
-                                 outcome_regression_model,
-                                 covariate_names) {
+                                 outcome_regression_model, # info modèle de régresion
+                                 covariate_names) { # info score de propension
 
   #############################
   ############## Drawing trials
@@ -282,10 +284,10 @@ for (row_population in 1:nrow(df_population_parameters)) {
   dir_sub_experiment <- file.path(experiment_results_directory, row_population)
   dir.create(dir_sub_experiment)
   list_simulation_parameters <- df_population_parameters[row_population, ] |> unlist()
-  population <- creating_population(list_simulation_parameters)
-  pop_init <- population$pop_init
-  df_outcomes <- population$df_outcomes
-  average_outcome_df <- population$average_outcome_df
+  population <- creating_population(list_simulation_parameters) # pop initiale
+  pop_init <- population$pop_init # données simulées
+  df_outcomes <- population$df_outcomes # outcome théorique par patient
+  average_outcome_df <- population$average_outcome_df # moyenne de ces outcomes (estimation empirique de l'effet marginal et conditionnel)
 
   saveRDS(average_outcome_df, file.path(dir_sub_experiment, "average_outcome_df.RDS"))
   for (row_estimators in 1:nrow(df_estimators_parameters)) {
