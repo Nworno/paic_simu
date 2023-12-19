@@ -113,6 +113,18 @@ creating_population <- function(list_simulation_parameters) {
     idcol = "outcome_type") |>
     dcast(outcome_type ~ ttt, value.var = "outcome")
   average_outcome_df[, AB := A - B]
+  # population_variance <- df_outcomes[, .(var_Y_obs = var(Y_obs)), by = c("ttt")] |> 
+  #   dcast(. ~ ttt, value.var = "var_Y_obs") |> 
+  #   dplyr::rename(var_population = `.`) |> 
+  #   dplyr::mutate(var_AB = A + B)
+  # 
+  # df_outcomes |> ggplot() + geom_violin(aes(x = Y_obs, y = ttt))
+  # diff_AB <- df_outcomes[ttt == "A", Y_obs] - df_outcomes[ttt == "B", Y_obs]
+  # mean(diff_AB)
+  # mean((diff_AB - mean(diff_AB))^2)
+  # 
+  # average_outcome_df <- merge(average_outcome_df, population_variance, by = "ttt")
+  # browser()
 
   # Correcting theoretically correction marginal effect, so that it is set to 0 when there is actually
   # no difference between theoretical conditional and marginal, as it should be

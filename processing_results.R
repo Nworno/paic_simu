@@ -32,6 +32,12 @@ combined_parameters <- merge(df_population_parameters[, .((.SD), key = 1)],
                              all.x = TRUE,
                              allow.cartesian = TRUE)
 
+df_true_effects_merged <- df_true_effects |>
+  merge(combined_parameters[, .((.SD), key = 1)],
+        all.x = TRUE,
+        allow.cartesian = TRUE)
+
+# View(df_true_effects_merged[, .SD, .SDcols = c("bY_A_X1", "bY_A_X2", names(df_true_effects))])
 
 ########################
 # Aligning DGM and estimators models:
