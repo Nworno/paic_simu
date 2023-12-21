@@ -13,6 +13,8 @@ load(file.path(dir_akiki2, "akiki_tb.RData"))
 akiki1 <- as_tibble(akiki, .name_repair = "unique")
 akiki2 <- as_tibble(akiki_tb, .name_repair = "unique")
 
+labels_akiki <- sapply(akiki, \(x) attr(x, "label"))
+names_akiki <- names(akiki)
 
 configure_report(add_plot_correlation = FALSE, add_plot_missing = FALSE)
 DataExplorer::create_report(akiki)
@@ -28,13 +30,21 @@ akiki2 |>
   select(grp_trt) |> 
   tbl_summary()
 
+#TODO: reprendre d'ici, comparer les résultats obtenus avec ceux de la publication
 # RRT-free days
 
+# Mortalité à J60
+names_akiki[labels_akiki == "Vivant à J60"]
 akiki |> 
-  select(randomization_unique, inc_bras, ) |> 
+  select(randomization_unique, all_of(names_akiki[labels_akiki == "Vivant à J60"])) |> 
+  gtsummary::tbl_summary(by = randomization_unique)
+
+
+akiki |> 
+  select(randomization_unique, inc_bras) |> 
   gtsummary::tbl_summary(by = inc_bras)
 
-# Mortalité à J60
+
 
 # Vivant à J60 sans EER
 # NULL
