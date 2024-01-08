@@ -3,33 +3,40 @@ library(data.table)
 options(mc.cores = 1)
 source("estimators.R")
 N_pop <- 10^6
-N_BOOT_ITER <- 2
+N_BOOT_ITER <- 20
 # Parameters
 ####################
 
 df_population_parameters <- list(
   prop_X1 = 0.5, # Variable binaire, prevalence dans la population
   bT_X1 = 0.5,   # Effet de la variable binaire sur la probabilité d'être dans l'essai AC
-  bT_X2 = 0.2,   # Effet de la variable continue X2...
+  bT_X2 = 1,   # Effet de la variable continue X2...
   bT_X3 = 0,     # Idem, mais inutile pour le moment
   bT_X4 = 0,     # Idem, mais inutile pour le moment
   bY_X1 = 1.5,   # Effet de X1 sur l'outcome
   bY_X2 = 0.5,   # Effet de X2 sur l'outcome
   bY_X3 = 0,     # Effet de X3 sur l'outcome (inutile pour le moment)
-  bY_X4 = 0,     # Effet de X4 sur l'outcome (inutile pour le moment)
+  bY_X4 = 0.5,     # Effet de X4 sur l'outcome
   bY_A_X1 = c(0, 1.2), # Interaction A et X1 dans le modèle outcome
-  bY_A_X2 = c(0, 0.2), # Interaction A et X2 dans le modèle outcome
+  bY_A_X2 = c(0, 0.6), # Interaction A et X2 dans le modèle outcome
+  bY_A_X3 = c(0), # Interaction A et X3 dans le modèle outcome
+  bY_A_X4 = c(0), # Interaction A et X4 dans le modèle outcome
+  binary_marker = c(bquote(rbinom(N_pop, 1, 0.5))), # Utilisé pour la variable bimodale
   f_X1 = c(bquote(rbinom(N_pop, 1, 0.5))), # distribution de X1 (revoir car il faudrait utiliser prop_X1)
-  f_X2 = c(bquote(rnorm(N_pop, 0.5, 1)), bquote(rlnorm(N_pop, 0.5, 0.5))), # distribution de X2
+  f_X2 = c(bquote(rnorm(N_pop, 0.5, 1)),
+           bquote(binary_marker * rnorm(N_pop, -2, 1) + (1 - binary_marker) * rnorm(N_pop, 2, 1))), # distribution de X2
   f_X3 = c(bquote(0)), # inutile pour le moment
+  # f_X4 = c(bquote(binary_marker * rnorm(N_pop, -1.5, 1) + (1 - binary_marker) * rnorm(N_pop, 1.5, 1))),
   f_X4 = c(bquote(0)), # inutile pour le moment
   bY_A = 1.5,  # Effet de A par rapport à C
   bY_B = 1.5,  # Effet de B par rapport à C
   bY_C = 0,    # Pas d'effet de C sur l'outcome
-  AC_trial_model = c(bquote(X1 * bT_X1 + X2 * bT_X2)), # Modèle d'attribution de l'essai AC
+  AC_trial_model = c(bquote(X1 * bT_X1 + X2 * bT_X2 + X3 * bT_X3 + X4 * bT_X4)), # Modèle d'attribution de l'essai AC
   BC_trial_model = c(bquote(0)),  # Modèle d'attribution de l'essai BC
-  outcome_generation_formula = c(
-  bquote(bY_X1*X1 + bY_X2 * X2 + bY_X3 * X3 + bY_X4 * X4 + (bY_A + bY_A_X1*X1 + bY_A_X2*X2) * A +  bY_B*B + bY_C*C))) |> 
+  outcome_generation_formula =  c(bquote(
+    bY_X1*X1 + bY_X2 * X2 + bY_X3 * X3 + bY_X4 * X4 + (bY_A + bY_A_X1*X1 + bY_A_X2*X2 + bY_A_X3*X3 + bY_A_X4*X4) * A +  bY_B*B + bY_C*C
+  ))
+) |> 
   expand.grid() |>
   as.data.table()
 df_population_parameters[, population_parameters_num := 1:.N]
@@ -289,7 +296,7 @@ df_estimators_parameters[, estimator_num := 1:.N]
 ###############
 ### SIMULATIONS
 ###############
-n_iter = 3
+n_iter = 30
 time_start <- Sys.time()
 time_start_string <- format(time_start, "%Y%m%d_%H%M%S")
 print(time_start_string)

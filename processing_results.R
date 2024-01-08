@@ -4,6 +4,7 @@ library(tidyr)
 library(stringr)
 
 dir_experience_results <- "results_simulations/20231024_100839/"
+dir_experience_results <- "results_simulations/20231220_181748/"
 
 list_files <- lapply(list.dirs(dir_experience_results, full.names = TRUE), \(x) {
   list.files(x, full.names = TRUE, pattern = "^experiment.*\\.RDS")
@@ -172,3 +173,41 @@ classification_scenario <- left_join(combined_parameters,
             by = c("estimator_num", "population_parameters_num")) |>
   left_join(nonnormal_distribution[, c("population_parameters_num", "any_nonnormal")],
             by = "population_parameters_num")
+
+# Long indicators
+get_bias <- function(obs, theo) {
+  mean(obs - theo, na.rm = FALSE)
+}
+get_RMSE <- function(obs, theo) {
+  sqrt(mean((obs - theo)**2, na.rm = FALSE))
+}
+get_VR <- function(obs, se_obs) {
+  mean(se_obs, na.rm = FALSE) / sd(obs, na.rm = FALSE)
+}
+get_cov_95 <- function(coef, se, theo) {
+  ub <- coef + qnorm(0.975)*se
+  lb <- coef - qnorm(0.975)*se
+  covered <- theo < ub & theo > lb
+  mean(covered, na.rm = FALSE)
+}
+
+correct_decision <- function(coef, se, theo) {
+  ub <- coef + qnorm(0.975)*se
+  lb <- coef - qnorm(0.975)*se
+  contains_0 <- ub >= 0 & lb <= 0
+  sign_estimate_theo_identical <- (theo >= 0 & coef >= 0) | (theo <= 0 & coef <= 0)
+  theo_is_null <- theo == 0
+  correct_decision <- ifelse(theo_is_null, contains_0, sign_estimate_theo_identical)
+  mean(correct_decision, na.rm = FALSE)
+}
+
+df_stats <- joined_results |>
+  group_by(Population_parameters_num, Estimator_num, Adjustment, Model, Anchored, Data) |>
+  summarize(bias = get_bias(Estimate, True_effect ),
+            rmse = get_RMSE(Estimate, True_effect ),
+            vr = get_VR(Estimate, sqrt(Variance)),
+            cov_95 = get_cov_95(Estimate, sqrt(Variance), True_effect ), 
+            correct_decision = correct_decision(Estimate, Variance, True_effect),
+            .groups = "drop") |>
+  pivot_longer(cols = c("bias", "rmse", "vr", "cov_95", "correct_decision"),
+               names_to = "indicator", values_to = "values") 
