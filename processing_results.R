@@ -3,8 +3,8 @@ library(dplyr)
 library(tidyr)
 library(stringr)
 
-dir_experience_results <- "results_simulations/20231024_100839/"
-dir_experience_results <- "results_simulations/20231220_181748/"
+dir_experience_results <- file.path("results_simulations", "20240109_122850")
+dir_experience_results <- file.path("results_simulations", "20240109_122850")
 
 list_files <- lapply(list.dirs(dir_experience_results, full.names = TRUE), \(x) {
   list.files(x, full.names = TRUE, pattern = "^experiment.*\\.RDS")
@@ -211,3 +211,8 @@ df_stats <- joined_results |>
             .groups = "drop") |>
   pivot_longer(cols = c("bias", "rmse", "vr", "cov_95", "correct_decision"),
                names_to = "indicator", values_to = "values") 
+
+dir.create(file.path(dir_experience_results, "processed_results"))
+saveRDS(df_stats, file.path(dir_experience_results, "processed_results", "df_stats.rds"))
+saveRDS(joined_results, file.path(dir_experience_results, "processed_results", "joined_results.rds"))
+

@@ -5,20 +5,23 @@ library("dplyr")
 
 ggthemr::ggthemr("pale")
 
-df_estimators_parameters <- readRDS("~/git_repos/paic_simu/results_simulations/20231024_100839/df_estimators_parameters.RDS")
-df_population_parameters <- readRDS("~/git_repos/paic_simu/results_simulations/20231024_100839/df_population_parameters.RDS")
-df_population_parameters <- readRDS("~/git_repos/paic_simu/results_simulations/20231220_181748/df_population_parameters.RDS")
+date_experiment <- "20240109_105721"
+dir_experiment <- file.path("results_simulations", date_experiment)
+df_estimators_parameters <- readRDS(file.path(dir_experiment, "df_estimators_parameters.RDS"))
+df_population_parameters <- readRDS(file.path(dir_experiment, "df_population_parameters.RDS"))
 
-estimator_num <- "3"
-num_experiment <- "8"
-path_experiment <- file.path("results_simulations/20231024_100839", num_experiment)
+estimator_num <- "1"
+num_experiment <- "4"
+path_experiment <- file.path(file.path(dir_experiment, num_experiment))
 results_experiment <- readRDS(file.path(path_experiment, paste0("experiment_", estimator_num, ".RDS")))
 true_results <- readRDS(file.path(path_experiment, "/average_outcome_df.RDS"))
+
 
 true_effect <- true_results[outcome_type == "conditional", AB]
 
 data_long <- results_experiment |> 
-  rbindlist() |>
+  rbindlist() |> 
+  group_by()
   mutate(mean_estimate = mean(estimate),
          # sd_estimate = sd(estimate),
          lb = estimate - qnorm(0.975)*sqrt(variance),

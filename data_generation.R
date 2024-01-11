@@ -1,9 +1,9 @@
 library(data.table)
 
-options(mc.cores = 1)
+options(mc.cores = 6)
 source("estimators.R")
 N_pop <- 10^6
-N_BOOT_ITER <- 20
+N_BOOT_ITER <- 500
 # Parameters
 ####################
 
@@ -276,7 +276,7 @@ list_outcome_regression_models <- paste0("Y_obs ~ ", c(
 df_estimators_parameters <- data.table(
   "covariate_names" = list_covariate_names,
   "outcome_regression_model" = list_outcome_regression_models,
-  N_RCT = 200
+  N_RCT = 500
 )
 df_estimators_parameters[, estimator_num := 1:.N]
 
@@ -296,7 +296,7 @@ df_estimators_parameters[, estimator_num := 1:.N]
 ###############
 ### SIMULATIONS
 ###############
-n_iter = 30
+n_iter = 200
 time_start <- Sys.time()
 time_start_string <- format(time_start, "%Y%m%d_%H%M%S")
 print(time_start_string)
@@ -313,7 +313,11 @@ for (row_population in 1:nrow(df_population_parameters)) {
   df_outcomes <- population$df_outcomes # outcome théorique par patient
   average_outcome_df <- population$average_outcome_df # moyenne de ces outcomes (estimation empirique de l'effet marginal et conditionnel)
 
-  saveRDS(average_outcome_df, file.path(dir_sub_experiment, "average_outcome_df.RDS"))
+  
+  saveRDS(pop_init, file.path(dir_sub_experiment, "pop_init.RDS"))
+  # Commented because huge file, so would take could much space if saved for every try 
+  # saveRDS(average_outcome_df, file.path(dir_sub_experiment, "average_outcome_df.RDS"))
+  
   for (row_estimators in 1:nrow(df_estimators_parameters)) {
     list_estimators_parameters <- df_estimators_parameters[row_estimators, ] |> unlist(recursive = FALSE)
     results_simulations <- parallel::mclapply(1:n_iter, \(i) {
