@@ -138,42 +138,45 @@ run_unanchored_conditional_estimation <- function(centered_trial_AC, centered_tr
 
 ########## PROPENSITY SCORE
 propensity_score <- function(trial_AC, trial_BC, anchored, covariate_names) {
-  df_anchored <- rbindlist(list("AC" = trial_AC, "BC" = trial_BC), idcol = "trial", fill = TRUE)
-  df_anchored[, trial := as.factor(trial)]
-  df_unanchored <- df_anchored[ttt %in% c("A", "B")]
-  stopifnot(levels(df_anchored$trial)[[1]] == "AC")
-  stopifnot(levels(df_unanchored$trial)[[1]] == "AC")
 
-  trial_BC_assigment_model <- paste0("trial ~ ", paste0(covariate_names, collapse = " + "))
-
+  browser()
   # /!\ a major difference between anchored and unanchored here is that anchored has 2x more patients!
   if (anchored) {
+    trial_BC_assigment_model <- paste0("trial ~ ", paste0(covariate_names, collapse = " + "))
+    df_anchored <- rbindlist(list("AC" = trial_AC, "BC" = trial_BC), idcol = "trial", fill = TRUE)
+    df_anchored[, trial := as.factor(trial)]
+    stopifnot(levels(df_anchored$trial)[[1]] == "AC")
     # predicting belonging to the AC trial
     df_anchored$PS_BC_trial <- glm(trial_BC_assigment_model, df_anchored, family = binomial(link = "logit"))$fitted.values
     df_anchored$ATC_w <- df_anchored[, (trial == "BC") + (trial == "AC") * PS_BC_trial / (1 - PS_BC_trial)]
-  } else {
-    df_unanchored$PS_B_trial <- glm(trial_BC_assigment_model, data = df_unanchored, family = binomial(link = "logit"))$fitted.values
-    df_unanchored$ATC_w <- df_unanchored[, (trial == "BC") + (trial == "AC") * PS_B_trial / (1 - PS_B_trial)]
-  }
-  if (anchored) {
+    
+    # Estimating AB effect in BC trial 
+    ##################################
     # obs_marginal_AC <- df_anchored[trial == "AC" & ttt == "A", weighted.mean(Y_obs, ATC_w)] -
     #   df_anchored[trial == "AC" & ttt == "C", weighted.mean(Y_obs, ATC_w)]
     # obs_marginal_BC <- df_anchored[trial == "BC" & ttt == "B", mean(Y_obs)] -
     #   df_anchored[trial == "BC" & ttt == "C", mean(Y_obs)]
     # estimate_AB <- obs_marginal_AC - obs_marginal_BC
     # var_anchored_marginal_AB <- trials_combined[trial == "AC" & ttt == "A", var(Y_obs * ATT_BC_w) / (.N * mean(ATT_BC_w))] + trials_combined[trial == "AC" & ttt == "C", var(Y_obs * ATT_BC_w) / (.N * mean(ATT_BC_w))] + trials_combined[trial == "BC" & ttt == "B", var(Y_obs * ATT_BC_w) / (.N * mean(ATT_BC_w))] + trials_combined[trial == "BC" & ttt == "C", var(Y_obs * ATT_BC_w) / (.N * mean(ATT_BC_w))]
-    # ### Alternative implementation
+    #### Alternative implementation
     model_marginal_AC <- glm(Y_obs ~ ttt, family = gaussian, data = df_anchored[trial == "AC"], weights = ATC_w)
     model_marginal_BC <- glm(Y_obs ~ ttt, family = gaussian, data = df_anchored[trial == "BC"])
     estimate_AB <- model_marginal_AC$coefficients[["tttA"]] - model_marginal_BC$coefficients[["tttB"]]
     # var_anchored_marginal_AB <- sandwich::vcovHC(model_marginal_AC)["tttA", "tttA"] +
     #   sandwich::vcovHC(model_marginal_BC)["tttB", "tttB"]
 
-    # Unanchored implementation
+  } else {
+    ttt_B_assigment_model <- paste0("ttt ~ ", paste0(covariate_names, collapse = " + "))
+    df_unanchored <- rbindlist(list(trial_AC[ttt == "A"],trial_BC[ttt == "B"]))
+    df_unanchored[, ttt := factor(ttt, levels = c("A", "B"))]
+    stopifnot(levels(df_unanchored$ttt)[[1]] == "A") 
+    df_unanchored$PS_B_trial <- glm(ttt_B_assigment_model, data = df_unanchored, family = binomial(link = "logit"))$fitted.values
+    df_unanchored$ATC_w <- df_unanchored[, (ttt == "B") + (ttt == "A") * PS_B_trial / (1 - PS_B_trial)]
+    
+    # Estimating AB effect in B trial 
+    ##################################
     # model_marginal_AB <- glm(Y_obs ~ ttt, family = gaussian, data = df_anchored[, ttt := relevel(ttt, ref = "B")], weights = ATC_w)
     # estimate_AB <- model_marginal_AB$coefficients[["tttA"]]
-
-  } else {
     estimate_AB <- df_unanchored[ttt == "A", weighted.mean(Y_obs, ATC_w)] - df_unanchored[ttt == "B", mean(Y_obs)]
     # var_unanchored_marginal_AB <- trials_combined[trial == "AC" & ttt == "A", var(Y_obs * ATT_BC_w) / (.N * mean(ATT_BC_w))] + trials_combined[trial == "BC" & ttt == "B", var(Y_obs * ATT_BC_w) / (.N * mean(ATT_BC_w))]
   }
