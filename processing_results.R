@@ -2,9 +2,9 @@ library(data.table)
 library(dplyr)
 library(tidyr)
 library(stringr)
+source("env_variables.R")
 
-dir_experience_results <- file.path("results_simulations", "20240109_122850")
-dir_experience_results <- file.path("results_simulations", "20240109_122850")
+dir_experience_results <- file.path("results_simulations", DATE_EXPERIMENT)
 
 list_files <- lapply(list.dirs(dir_experience_results, full.names = TRUE), \(x) {
   list.files(x, full.names = TRUE, pattern = "^experiment.*\\.RDS")
@@ -12,11 +12,14 @@ list_files <- lapply(list.dirs(dir_experience_results, full.names = TRUE), \(x) 
 nested_list_results_df <- rapply(list_files, classes = "character", how = "replace", \(x) {
   sapply(x, readRDS, simplify = FALSE)
 })
-long_df_results <- lapply(nested_list_results_df, \(l) lapply(l, rbindlist, idcol = "iteration")) |>
+long_df_results <- lapply(nested_list_results_df, \(l) {
+  l_wo_errors <- lapply(l, \(x) Filter(\(y) !"try-error" %in% class(y), x))
+  # l_wo_errors <- lapply(l, \(x) lapply(x, \(y) Filter(\(z) !"try-error" %in% class(z) | !"character" %in% class(z), y)))
+  lapply(l_wo_errors, rbindlist, idcol = "iteration")
+  }) |>
   lapply(rbindlist, idcol = "estimator_num") |>
   rbindlist(idcol = "population_parameters_num")
 long_df_results[, estimator_num := gsub(pattern = ".*(?<=experiment_)(\\d+)(?=\\.RDS).*", replacement = "\\1", x = estimator_num, perl = TRUE)]
-
 
 df_true_effects <- list.dirs(dir_experience_results) |>
   lapply(list.files, pattern = "average_outcome_df", full.names = TRUE) |>
@@ -143,7 +146,7 @@ nonnormal_distribution <- df_population_parameters |>
   select(c(population_parameters_num, matches("f_X"))) |>
   # TODO: pattern à mettre à jour pour récupérer toutes les façons de créer
   # des variables distribuées non normalement
-  mutate(across(matches("f_X"), \(x) grepl("rlnorm", x))) |>
+  mutate(across(matches("f_X"), \(x) grepl("binary_marker", x))) |>
   rowwise() |>
   mutate(any_nonnormal = any(c_across(f_X1:f_X4)),
          nonnormal_distribution = list(c("f_X1", "f_X2", "f_X3", "f_X4")[c(f_X1, f_X2, f_X3, f_X4)]))

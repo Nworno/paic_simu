@@ -11,7 +11,7 @@ ggthemr::ggthemr("pale")
 
 source("processing_results.R")
 # View(classification_scenario)
-path_results <- file.path("results_simulations", "20240109_122850", "processed_results")
+path_results <- file.path(dir_experience_results, "processed_results")
 
 get_bias <- function(obs, theo) {
   mean(obs - theo, na.rm = FALSE)
@@ -98,35 +98,52 @@ df_stats$methodX <- factor(df_stats$methodX, ordreX)
 df_stats$methodnoanch <- factor(df_stats$methodnoanch, ordrenoanch)
 df_stats$methodXnoanch <- factor(df_stats$methodXnoanch, ordreXnoanch)
 
-df_stats$nonnormal <- ifelse(df_stats$any_nonnormal, "X2 lognorm", "X2 norm")
-df_stats$nonnormal <- factor(df_stats$nonnormal, c("X2 norm", "X2 lognorm"))
+df_stats$nonnormal <- ifelse(df_stats$any_nonnormal, "X2 bimodal", "X2 norm")
+df_stats$nonnormal <- factor(df_stats$nonnormal, c("X2 norm", "X2 bimodal"))
 
 df_stats$effectmod <- ifelse(df_stats$bY_A_X1 == 0 & df_stats$bY_A_X2 == 0, 1, NA)
 df_stats$effectmod <- ifelse(df_stats$bY_A_X1 > 0 & df_stats$bY_A_X2 == 0, 2, df_stats$effectmod)
 df_stats$effectmod <- ifelse(df_stats$bY_A_X1 == 0 & df_stats$bY_A_X2 > 0, 3, df_stats$effectmod)
 df_stats$effectmod <- ifelse(df_stats$bY_A_X1 > 0 & df_stats$bY_A_X2 > 0, 4, df_stats$effectmod)
-df_stats$effectmod <- factor(df_stats$effectmod, 1:4, c("no eff. mod.", "eff. mod. X1", "eff. mod. X2", "eff. mod. X1X2"))
+df_stats$effectmod <- factor(df_stats$effectmod, 1:4, c("no TEM", "eff. mod. X1", "X2 TEM", "eff. mod. X1X2"))
 
 df_stats$X <- sub("(^.+ : )(.+$)", "\\2", df_stats$methodX)
 
+df_stats <- df_stats |> dplyr::mutate(X = paste0("Adjusted on ", X)) |> 
+  dplyr::filter(!grepl("Unadjusted", X))
+
 ## Bias
-ggplot(data = df_stats[df_stats$indicator == "bias", ], aes(x = values, y = method, color = Anchored, fill = Anchored, shape = X)) +
-  geom_point() + # pour unajdusted, plusieurs résultats pour une mm combinaison (pas trouver pourquoi)
+ggplot(data = df_stats[df_stats$indicator == "bias", ], aes(x = values, y = method, color = Anchored, shape = X)) +
+  geom_point(size = 3) + 
   geom_vline(xintercept = 0) +
-  facet_grid(methodnoanch ~ Population_parameters_num + nonnormal + effectmod, scales = "free_y") +
-  scale_color_manual(values = alpha(c("#3262ab", "#de6757"))) +
-  theme(axis.text.x = element_text(size = 6))
+  facet_grid(methodnoanch ~ nonnormal + effectmod, scales = "free_y") +
+  scale_color_manual(values = alpha(c("#3262ab", "#de6757")), name = NULL, guide = FALSE) +
+  scale_shape(name = "Confounding") +
+  labs(x = "Bias", y = NULL) +
+  theme(axis.text.x = element_text(size = 8),
+        axis.text.y = element_text(size = 12),
+        strip.text = element_text(size = 12),
+        axis.title.x = element_text(size = 16),
+        legend.text = element_text(size = 12),
+        legend.position = "bottom", legend.box = "vertical")
 ggsave(file.path(path_results, "bias.pdf"), width = 15, height = 7)
 ## Pourquoi 3 lignes ici ?
 df_stats[df_stats$methodX == "Unadjusted anchored" & df_stats$Anchored == "Anchored" & df_stats$indicator == "bias" & df_stats$Population_parameters_num == 1, ]
 
 ## rmse
-ggplot(data = df_stats[df_stats$indicator == "rmse", ], aes(x = values, y = method, color = Anchored, fill = Anchored, shape = X)) +
-  geom_point() + # pour unajdusted, plusieurs résultats pour une mm combinaison (pas trouver pourquoi)
+ggplot(data = df_stats[df_stats$indicator == "rmse", ], aes(x = values, y = method, color = Anchored, shape = X)) +
+  geom_point(size = 3) + 
   geom_vline(xintercept = 0) +
-  facet_grid(methodnoanch ~ Population_parameters_num + nonnormal + effectmod, scales = "free_y") +
-  scale_color_manual(values = alpha(c("#3262ab", "#de6757"))) +
-  theme(axis.text.x = element_text(size = 6))
+  facet_grid(methodnoanch ~ nonnormal + effectmod, scales = "free_y") +
+  scale_color_manual(values = alpha(c("#3262ab", "#de6757")), name = NULL, guide = FALSE) +
+  scale_shape(name = "Confounding") +
+  labs(x = "RMSE", y = NULL) +
+  theme(axis.text.x = element_text(size = 8),
+        axis.text.y = element_text(size = 12),
+        strip.text = element_text(size = 12),
+        legend.text = element_text(size = 12),
+        axis.title.x = element_text(size = 16),
+        legend.position = "bottom", legend.box = "vertical")
 ggsave(file.path(path_results, "rmse.pdf"), width = 15, height = 7)
 
 ## vr
@@ -136,6 +153,7 @@ ggplot(data = df_stats[df_stats$indicator == "vr", ], aes(x = values, y = method
   facet_grid(methodnoanch ~ Population_parameters_num + nonnormal + effectmod, scales = "free_y") +
   scale_color_manual(values = alpha(c("#3262ab", "#de6757"))) +
   theme(axis.text.x = element_text(size = 6))
+  labs(x = "VR", y = NULL) + 
 ggsave(file.path(path_results, "vr.pdf"), width = 15, height = 7)
 
 ## cov_95
@@ -145,6 +163,7 @@ ggplot(data = df_stats[df_stats$indicator == "cov_95", ], aes(x = values, y = me
   facet_grid(methodnoanch ~ Population_parameters_num + nonnormal + effectmod, scales = "free_y") +
   scale_color_manual(values = alpha(c("#3262ab", "#de6757"))) +
   theme(axis.text.x = element_text(size = 6))
+  labs(x = "95% coverage", y = NULL) + 
 ggsave(file.path(path_results, "cov_95.pdf"), width = 15, height = 7)
 
 ## Correct decision
@@ -155,3 +174,4 @@ ggplot(data = df_stats[df_stats$indicator == "correct_decision", ], aes(x = valu
   scale_color_manual(values = alpha(c("#3262ab", "#de6757"))) +
   theme(axis.text.x = element_text(size = 6))
 ggsave(file.path(path_results, "correct_decision.pdf"), width = 15, height = 7)
+

@@ -5,23 +5,21 @@ library("dplyr")
 
 ggthemr::ggthemr("pale")
 
-date_experiment <- "20240109_105721"
-dir_experiment <- file.path("results_simulations", date_experiment)
+dir_experiment <- file.path("results_simulations", DATE_EXPERIMENT)
 df_estimators_parameters <- readRDS(file.path(dir_experiment, "df_estimators_parameters.RDS"))
 df_population_parameters <- readRDS(file.path(dir_experiment, "df_population_parameters.RDS"))
 
-estimator_num <- "1"
-num_experiment <- "4"
+estimator_num <- "3"
+num_experiment <- "1"
 path_experiment <- file.path(file.path(dir_experiment, num_experiment))
 results_experiment <- readRDS(file.path(path_experiment, paste0("experiment_", estimator_num, ".RDS")))
-true_results <- readRDS(file.path(path_experiment, "/average_outcome_df.RDS"))
-
+true_results <- readRDS(file.path(path_experiment, "average_outcome_df.RDS"))
 
 true_effect <- true_results[outcome_type == "conditional", AB]
 
 data_long <- results_experiment |> 
   rbindlist() |> 
-  group_by()
+  group_by(adjustment, model, anchored) |> 
   mutate(mean_estimate = mean(estimate),
          # sd_estimate = sd(estimate),
          lb = estimate - qnorm(0.975)*sqrt(variance),

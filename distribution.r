@@ -1,44 +1,64 @@
-library(dplyr)
 library(data.table)
-N_pop <- 10^6
-N_RCT = 2000
 
-## Fonction pour générer un mélange de 2 loi lognormale
-rnormbimod <- function(n, mean1, sd1, mean2, sd2) {
-  sample(c(rnorm(n/2, mean1, sd1), rnorm(n/2, mean2, sd2)))
-}
-rlnormbimod <- function(n, meanlog1, sdlog1, meanlog2, sdlog2) {
-  sample(c(rlnorm(n/2, meanlog1, sdlog1), rlnorm(n/2, meanlog2, sdlog2)))
-}
+options(mc.cores = 1)
+source("estimators.R")
+N_pop <- 10^6
+N_BOOT_ITER <- 10
+# Parameters
+####################
 
 df_population_parameters <- list(
   prop_X1 = 0.5, # Variable binaire, prevalence dans la population
-  bT_X1 = 0.5,   # Effet de la variable binaire sur la probabilité d'être dans l'essai AC
-  bT_X2 = c(-5, -2, -1, -0.2, 0.2, 1, 2, 5),   # Effet de la variable continue X2...
+  bT_X1 = c(3),   # Effet de la variable binaire sur la probabilité d'être dans l'essai AC
+  bT_X2 = c(5),   # Effet de la variable continue X2...
   bT_X3 = 0,     # Idem, mais inutile pour le moment
   bT_X4 = 0,     # Idem, mais inutile pour le moment
   bY_X1 = 1.5,   # Effet de X1 sur l'outcome
   bY_X2 = 0.5,   # Effet de X2 sur l'outcome
   bY_X3 = 0,     # Effet de X3 sur l'outcome (inutile pour le moment)
-  bY_X4 = 0,     # Effet de X4 sur l'outcome (inutile pour le moment)
-  bY_A_X1 = c(0, 1.2), # Interaction A et X1 dans le modèle outcome
-  bY_A_X2 = c(0, 0.2), # Interaction A et X2 dans le modèle outcome
+  bY_X4 = 0.5,     # Effet de X4 sur l'outcome
+  bY_A_X1 = c(0), # Interaction A et X1 dans le modèle outcome
+  bY_A_X2 = c(0, 1), # Interaction A et X2 dans le modèle outcome
+  bY_A_X3 = c(0), # Interaction A et X3 dans le modèle outcome
+  bY_A_X4 = c(0), # Interaction A et X4 dans le modèle outcome
+  binary_marker = c(bquote(rbinom(N_pop, 1, 0.5))), # Utilisé pour la variable bimodale
   f_X1 = c(bquote(rbinom(N_pop, 1, 0.5))), # distribution de X1 (revoir car il faudrait utiliser prop_X1)
-  f_X2 = c(bquote(rnorm(N_pop, 0.5, 1)), bquote(rlnorm(N_pop, 0.5, 0.5)), bquote(rnormbimod(N_pop, 0.5, 0.5, -3, 1.5)), bquote(rlnormbimod(N_pop, 0.5, 0.5, -3, 1.5))), # distribution de X2
+  f_X2 = c(bquote(rnorm(N_pop, 0.5, 1)),
+           bquote(binary_marker * rnorm(N_pop, -2, 1) + (1 - binary_marker) * rnorm(N_pop, 2, 1))), # distribution de X2
   f_X3 = c(bquote(0)), # inutile pour le moment
+  # f_X4 = c(bquote(binary_marker * rnorm(N_pop, -1.5, 1) + (1 - binary_marker) * rnorm(N_pop, 1.5, 1))),
   f_X4 = c(bquote(0)), # inutile pour le moment
   bY_A = 1.5,  # Effet de A par rapport à C
   bY_B = 1.5,  # Effet de B par rapport à C
   bY_C = 0,    # Pas d'effet de C sur l'outcome
-  AC_trial_model = c(bquote(X1 * bT_X1 + X2 * bT_X2)), # Modèle d'attribution de l'essai AC
+  AC_trial_model = c(bquote(X1 * bT_X1 + X2 * bT_X2 + X3 * bT_X3 + X4 * bT_X4)), # Modèle d'attribution de l'essai AC
   BC_trial_model = c(bquote(0)),  # Modèle d'attribution de l'essai BC
-  outcome_generation_formula = c(
-    bquote(bY_X1*X1 + bY_X2 * X2 + bY_X3 * X3 + bY_X4 * X4 + (bY_A + bY_A_X1*X1 + bY_A_X2*X2) * A +  bY_B*B + bY_C*C))) |> 
+  outcome_generation_formula =  c(bquote(
+    bY_X1*X1 + bY_X2 * X2 + bY_X3 * X3 + bY_X4 * X4 + (bY_A + bY_A_X1*X1 + bY_A_X2*X2 + bY_A_X3*X3 + bY_A_X4*X4) * A +  bY_B*B + bY_C*C
+  ))
+)  |> 
   expand.grid() |>
   as.data.table()
 df_population_parameters[, population_parameters_num := 1:.N]
-df_population_parameters$f_X2_char <- as.character(df_population_parameters$f_X2)
-df_population_parameters <- df_population_parameters[!duplicated(df_population_parameters[, c("bT_X2", "f_X2_char")]), ] ## Pas la peine de faire les scénarios qui ajoutent ou non une modification d'effet ici
+# df_population_parameters <- df_population_parameters[population_parameters_num == 6,]
+
+######### Models
+##################
+## Note David: we could have
+## one binary variable X1
+## one continuous variable X2
+## one parameter to switch the binary variable between prognostic only (bYA_X1 = 0) or effect modifier (bYA_X1 != 0)
+## one parameter to switch the continuous variable between prognostic only (bYA_X2Ò = 0) or effect modifier (bYA_X2 != 0)
+## one parameter to switch the continuous variable distribution: normal (symmetrical) or lognormal (asymmetrical)
+## Overall, 8 scenarios here
+##
+## Then, run all estimators. For estimators taking into accounts covariates, run three estimations:
+## - only X1
+## - only X2
+## - both X1 and X2
+## For estimators taking into accounts moments, run with (to be discussed):
+## - first moment only
+## - first and second moments
 
 ##############################################
 ########### Creating an overarching population
@@ -46,7 +66,7 @@ df_population_parameters <- df_population_parameters[!duplicated(df_population_p
 
 ## Génère une data.frame de 10^6 ou 7 lignes
 creating_population <- function(list_simulation_parameters) {
-  suppressMessages(attach(list_simulation_parameters))
+  attach(list_simulation_parameters)
   binary_marker <- rbinom(N_pop, 1, 0.5)
   pop_init <- data.table(
     id = 1:N_pop,
@@ -100,10 +120,22 @@ creating_population <- function(list_simulation_parameters) {
     idcol = "outcome_type") |>
     dcast(outcome_type ~ ttt, value.var = "outcome")
   average_outcome_df[, AB := A - B]
+  # population_variance <- df_outcomes[, .(var_Y_obs = var(Y_obs)), by = c("ttt")] |> 
+  #   dcast(. ~ ttt, value.var = "var_Y_obs") |> 
+  #   dplyr::rename(var_population = `.`) |> 
+  #   dplyr::mutate(var_AB = A + B)
+  # 
+  # df_outcomes |> ggplot() + geom_violin(aes(x = Y_obs, y = ttt))
+  # diff_AB <- df_outcomes[ttt == "A", Y_obs] - df_outcomes[ttt == "B", Y_obs]
+  # mean(diff_AB)
+  # mean((diff_AB - mean(diff_AB))^2)
+  # 
+  # average_outcome_df <- merge(average_outcome_df, population_variance, by = "ttt")
+  # browser()
   
-  # Correcting theoretically correction marginal effect, so that it is set to 0 when there is actually
+  # Correcting theoretical marginal effect, so that it is set to 0 when there is actually
   # no difference between theoretical conditional and marginal, as it should be
-  # Useful to quantify estimators alpha and beta risk level respect
+  # Useful to quantify estimators alpha and beta nominal risk level 
   if (average_outcome_df[outcome_type == "conditional", AB] == 0) average_outcome_df[, AB := 0]
   
   return(list(
@@ -112,6 +144,7 @@ creating_population <- function(list_simulation_parameters) {
     "average_outcome_df" = average_outcome_df
   ))
 }
+
 
 cat("Scenario ", 1, "\n")
 pop <- creating_population(unlist(df_population_parameters[1, ]))
