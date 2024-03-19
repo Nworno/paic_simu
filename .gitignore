@@ -11,3 +11,4 @@ renv/
 resultats_simus_david/
 presentations/
 *.pdf
+.DS_Store

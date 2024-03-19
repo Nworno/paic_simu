@@ -1,46 +1,46 @@
 library(data.table)
 
-options(mc.cores = 6)
+options(mc.cores = 7)
 source("estimators.R")
 N_pop <- 10^6
-N_BOOT_ITER <- 500
+N_BOOT_ITER <- 300
 # Parameters
 ####################
 
 df_population_parameters <- list(
   prop_X1 = 0.5, # Variable binaire, prevalence dans la population
-  bT_X1 = 0.5,   # Effet de la variable binaire sur la probabilité d'être dans l'essai AC
-  bT_X2 = 1,   # Effet de la variable continue X2...
+  bT_X1 = c(2),   # Effet de la variable binaire sur la probabilité d'être dans l'essai AC
+  bT_X2 = c(0, 1),   # Effet de la variable continue X2...
   bT_X3 = 0,     # Idem, mais inutile pour le moment
   bT_X4 = 0,     # Idem, mais inutile pour le moment
   bY_X1 = 1.5,   # Effet de X1 sur l'outcome
-  bY_X2 = 0.5,   # Effet de X2 sur l'outcome
+  bY_X2 = 1,   # Effet de X2 sur l'outcome
   bY_X3 = 0,     # Effet de X3 sur l'outcome (inutile pour le moment)
   bY_X4 = 0.5,     # Effet de X4 sur l'outcome
-  bY_A_X1 = c(0, 1.2), # Interaction A et X1 dans le modèle outcome
-  bY_A_X2 = c(0, 0.6), # Interaction A et X2 dans le modèle outcome
+  bY_A_X1 = c(0, 1), # Interaction A et X1 dans le modèle outcome
+  bY_A_X2 = c(0, 1), # Interaction A et X2 dans le modèle outcome
   bY_A_X3 = c(0), # Interaction A et X3 dans le modèle outcome
   bY_A_X4 = c(0), # Interaction A et X4 dans le modèle outcome
   binary_marker = c(bquote(rbinom(N_pop, 1, 0.5))), # Utilisé pour la variable bimodale
-  f_X1 = c(bquote(rbinom(N_pop, 1, 0.5))), # distribution de X1 (revoir car il faudrait utiliser prop_X1)
-  f_X2 = c(bquote(rnorm(N_pop, 0.5, 1)),
-           bquote(binary_marker * rnorm(N_pop, -2, 1) + (1 - binary_marker) * rnorm(N_pop, 2, 1))), # distribution de X2
+  f_X1 = c(bquote(rnorm(N_pop, -2, 1))), # distribution de X1 (revoir car il faudrait utiliser prop_X1)
+  f_X2 = c(bquote(binary_marker * rnorm(N_pop, -2, 1) + (1 - binary_marker) * rnorm(N_pop, 2, 1))), # distribution de X2
   f_X3 = c(bquote(0)), # inutile pour le moment
   # f_X4 = c(bquote(binary_marker * rnorm(N_pop, -1.5, 1) + (1 - binary_marker) * rnorm(N_pop, 1.5, 1))),
   f_X4 = c(bquote(0)), # inutile pour le moment
   bY_A = 1.5,  # Effet de A par rapport à C
   bY_B = 1.5,  # Effet de B par rapport à C
   bY_C = 0,    # Pas d'effet de C sur l'outcome
-  AC_trial_model = c(bquote(X1 * bT_X1 + X2 * bT_X2 + X3 * bT_X3 + X4 * bT_X4)), # Modèle d'attribution de l'essai AC
-  BC_trial_model = c(bquote(0)),  # Modèle d'attribution de l'essai BC
+  imbalanced_trial = c("AC", "BC"),
+  imbalanced_trial_model = c(bquote(X1 * bT_X1 + X2 * bT_X2 + X3 * bT_X3 + X4 * bT_X4)), # Modèle d'attribution de l'essai AC
+  balanced_trial_model = c(bquote(0)),  # Modèle d'attribution de l'essai BC
   outcome_generation_formula =  c(bquote(
     bY_X1*X1 + bY_X2 * X2 + bY_X3 * X3 + bY_X4 * X4 + (bY_A + bY_A_X1*X1 + bY_A_X2*X2 + bY_A_X3*X3 + bY_A_X4*X4) * A +  bY_B*B + bY_C*C
   ))
-) |> 
+)  |> 
   expand.grid() |>
   as.data.table()
 df_population_parameters[, population_parameters_num := 1:.N]
-
+# df_population_parameters <- df_population_parameters[population_parameters_num == 6,]
 
 ######### Models
 ##################
@@ -48,7 +48,7 @@ df_population_parameters[, population_parameters_num := 1:.N]
 ## one binary variable X1
 ## one continuous variable X2
 ## one parameter to switch the binary variable between prognostic only (bYA_X1 = 0) or effect modifier (bYA_X1 != 0)
-## one parameter to switch the continuous variable between prognostic only (bYA_X2 = 0) or effect modifier (bYA_X2 != 0)
+## one parameter to switch the continuous variable between prognostic only (bYA_X2Ò = 0) or effect modifier (bYA_X2 != 0)
 ## one parameter to switch the continuous variable distribution: normal (symmetrical) or lognormal (asymmetrical)
 ## Overall, 8 scenarios here
 ##
@@ -67,6 +67,14 @@ df_population_parameters[, population_parameters_num := 1:.N]
 ## Génère une data.frame de 10^6 ou 7 lignes
 creating_population <- function(list_simulation_parameters) {
   attach(list_simulation_parameters)
+  if (imbalanced_trial == "AC") {
+    BC_trial_model = balanced_trial_model  # Modèle d'attribution de l'essai BC
+    AC_trial_model = imbalanced_trial_model
+  } else {
+    BC_trial_model = imbalanced_trial_model
+    AC_trial_model = balanced_trial_model
+  }
+  
   binary_marker <- rbinom(N_pop, 1, 0.5)
   pop_init <- data.table(
     id = 1:N_pop,
@@ -133,11 +141,12 @@ creating_population <- function(list_simulation_parameters) {
   # average_outcome_df <- merge(average_outcome_df, population_variance, by = "ttt")
   # browser()
 
-  # Correcting theoretically correction marginal effect, so that it is set to 0 when there is actually
+  # Correcting theoretical marginal effect, so that it is set to 0 when there is actually
   # no difference between theoretical conditional and marginal, as it should be
-  # Useful to quantify estimators alpha and beta risk level respect
+  # Useful to quantify estimators alpha and beta nominal risk level 
   if (average_outcome_df[outcome_type == "conditional", AB] == 0) average_outcome_df[, AB := 0]
 
+  detach(list_simulation_parameters)
   return(list(
     "pop_init" = pop_init,
     "df_outcomes" = df_outcomes,
@@ -151,8 +160,9 @@ indirect_comparisons <- function(pop_init,
                                  struct_results,
                                  N_BOOT_ITER,
                                  N_RCT,
-                                 outcome_regression_model, # info modèle de régresion
-                                 covariate_names) { # info score de propension
+                                 outcome_regression_model,
+                                 covariate_names, 
+                                 glm_family = gaussian) { 
 
   #############################
   ############## Drawing trials
@@ -171,58 +181,86 @@ indirect_comparisons <- function(pop_init,
   trial_BC <- pop_init[selected_outcomes_BC, on = "id"][, ttt := factor(ttt, levels = c("C", "B"))]
 
   average_trial_BC_covariates <- trial_BC[, lapply(.SD, mean), .SDcols = covariate_names]
-  centered_trial_AC <- trial_AC[, mapply(`-`, .SD, average_trial_BC_covariates), .SDcols = covariate_names] |>
-    cbind(trial_AC[, .(ttt, Y_obs)])
-  centered_trial_BC <- trial_BC[, mapply(`-`, .SD, average_trial_BC_covariates), .SDcols = covariate_names] |>
-    cbind(trial_BC[, .(ttt, Y_obs)])
+  # centered_trial_AC <- trial_AC[, mapply(`-`, .SD, average_trial_BC_covariates), .SDcols = covariate_names] |>
+  #   cbind(trial_AC[, .(ttt, Y_obs)])
+  # centered_trial_BC <- trial_BC[, mapply(`-`, .SD, average_trial_BC_covariates), .SDcols = covariate_names] |>
+  #   cbind(trial_BC[, .(ttt, Y_obs)])
 
   ###############################
   ########## Unadjusted estimator
   ###############################
-  struct_results$unadjusted$anchored$unadjusted <- run_unadjusted_estimator(trial_AC, trial_BC, anchored = TRUE)
-  struct_results$unadjusted$unanchored$unadjusted <- run_unadjusted_estimator(trial_AC, trial_BC, anchored = FALSE)
+  struct_results$unadjusted$anchored$unadjusted <- run_unadjusted_estimator(trial_AC, trial_BC, anchored = TRUE, glm_family)
+  struct_results$unadjusted$unanchored$unadjusted <- run_unadjusted_estimator(trial_AC, trial_BC, anchored = FALSE, glm_family)
 
   ##############################################################
   ########## REGRESSION BASED OUTCOME MODEL (both treatment IPD)
   ##############################################################
-
-  struct_results$regression$anchored$glm <- run_anchored_conditional_estimation(centered_trial_AC,
-                                                                                centered_trial_BC,
-                                                                                outcome_regression_model,
-                                                                                gaussian)
-  struct_results$regression$unanchored$glm <- run_unanchored_conditional_estimation(centered_trial_AC,
-                                                                                    centered_trial_BC,
-                                                                                    outcome_regression_model,
-                                                                                    gaussian)
+  
+  struct_results$regression$anchored$glm <- run_regression_model(trial_AC,
+                                                                 trial_BC, 
+                                                                 outcome_regression_model,
+                                                                 covariate_names,
+                                                                 full_ipd = TRUE, 
+                                                                 anchored = TRUE, 
+                                                                 glm_family = glm_family)
+  struct_results$regression$unanchored$glm <-  run_regression_model(trial_AC,
+                                                                    trial_BC, 
+                                                                    outcome_regression_model,
+                                                                    covariate_names,
+                                                                    full_ipd = TRUE, 
+                                                                    anchored = FALSE, 
+                                                                    glm_family = glm_family)
 
   #################################################
   ########### PROPENSITY SCORE (both treatment IPD)
   #################################################
 
-  struct_results$iptw$anchored$ml <- run_propensity_score(trial_AC, trial_BC, anchored = TRUE, covariate_names)
-  struct_results$iptw$unanchored$ml <- run_propensity_score(trial_AC, trial_BC, anchored = FALSE, covariate_names)
+  struct_results$iptw$anchored$ml <- run_propensity_score(trial_AC, 
+                                                          trial_BC, 
+                                                          covariate_names, 
+                                                          anchored = TRUE,
+                                                          weight_estimation_method = "max_likelihood",
+                                                          studying_populations = FALSE)
+  struct_results$iptw$unanchored$ml <- run_propensity_score(trial_AC, 
+                                                            trial_BC, 
+                                                            covariate_names, 
+                                                            anchored = FALSE,
+                                                            weight_estimation_method = "max_likelihood",
+                                                            studying_populations = FALSE)
 
   #########
   ### MAIC
   #########
-  struct_results$iptw$anchored$maic <- run_maic(trial_AC, trial_BC, covariate_names, anchored = TRUE, outcome_family = gaussian)
-  struct_results$iptw$unanchored$maic <- run_maic(trial_AC, trial_BC, covariate_names, anchored = FALSE, outcome_family = gaussian)
+  struct_results$iptw$anchored$maic <- run_propensity_score(trial_AC, 
+                                                            trial_BC, 
+                                                            covariate_names, 
+                                                            anchored = TRUE,
+                                                            weight_estimation_method = "moments",
+                                                            studying_populations = FALSE)
+  struct_results$iptw$unanchored$maic <- run_propensity_score(trial_AC, 
+                                                              trial_BC, 
+                                                              covariate_names, 
+                                                              anchored = FALSE,
+                                                              weight_estimation_method = "moments",
+                                                              studying_populations = FALSE)
 
   ##########
   ###### STC
   ##########
-  struct_results$regression$anchored$stc <- run_stc(centered_trial_AC,
-                                                    trial_BC,
-                                                    anchored = TRUE,
-                                                    outcome_regression_model,
-                                                    covariate_names = NULL,
-                                                    outcome_family = gaussian)
-  struct_results$regression$unanchored$stc <- run_stc(centered_trial_AC,
-                                                      trial_BC,
-                                                      anchored = FALSE,
-                                                      outcome_regression_model = NULL,
-                                                      covariate_names,
-                                                      outcome_family = gaussian)
+  struct_results$regression$anchored$stc <- run_regression_model(trial_AC,
+                                                                 trial_BC, 
+                                                                 outcome_regression_model,
+                                                                 covariate_names,
+                                                                 full_ipd = FALSE, 
+                                                                 anchored = TRUE, 
+                                                                 glm_family = glm_family)
+  struct_results$regression$unanchored$stc <- run_regression_model(trial_AC,
+                                                                   trial_BC, 
+                                                                   outcome_regression_model,
+                                                                   covariate_names,
+                                                                   full_ipd = FALSE, 
+                                                                   anchored = FALSE, 
+                                                                   glm_family = glm_family)
 
 
   ##############################
@@ -238,8 +276,6 @@ indirect_comparisons <- function(pop_init,
 
   return(rectangle_results)
 }
-
-
 
 
 struct_results <- list(
@@ -296,7 +332,7 @@ df_estimators_parameters[, estimator_num := 1:.N]
 ###############
 ### SIMULATIONS
 ###############
-n_iter = 200
+n_iter = 300
 time_start <- Sys.time()
 time_start_string <- format(time_start, "%Y%m%d_%H%M%S")
 print(time_start_string)
@@ -314,9 +350,9 @@ for (row_population in 1:nrow(df_population_parameters)) {
   average_outcome_df <- population$average_outcome_df # moyenne de ces outcomes (estimation empirique de l'effet marginal et conditionnel)
 
   
-  saveRDS(pop_init, file.path(dir_sub_experiment, "pop_init.RDS"))
+  saveRDS(average_outcome_df, file.path(dir_sub_experiment, "average_outcome_df.RDS"))
   # Commented because huge file, so would take could much space if saved for every try 
-  # saveRDS(average_outcome_df, file.path(dir_sub_experiment, "average_outcome_df.RDS"))
+  # saveRDS(pop_init, file.path(dir_sub_experiment, "pop_init.RDS"))
   
   for (row_estimators in 1:nrow(df_estimators_parameters)) {
     list_estimators_parameters <- df_estimators_parameters[row_estimators, ] |> unlist(recursive = FALSE)
