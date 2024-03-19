@@ -12,3 +12,6 @@ resultats_simus_david/
 presentations/
 *.pdf
 .DS_Store
+studying_weighting_fn/
+sandbox.R
+non_normal_distributions.R
