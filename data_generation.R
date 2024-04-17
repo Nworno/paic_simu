@@ -1,11 +1,5 @@
 library(data.table)
 
-options(mc.cores = 7)
-source("estimators.R")
-N_pop <- 10^6
-N_BOOT_ITER <- 300
-# Parameters
-####################
 
 df_population_parameters <- list(
   prop_X1 = 0.5, # Variable binaire, prevalence dans la population
@@ -162,7 +156,7 @@ indirect_comparisons <- function(pop_init,
                                  N_RCT,
                                  outcome_regression_model,
                                  covariate_names, 
-                                 glm_family = gaussian) { 
+                                 glm_family = gaussian(link = "identity")) { 
 
   #############################
   ############## Drawing trials
@@ -202,14 +196,14 @@ indirect_comparisons <- function(pop_init,
                                                                  covariate_names,
                                                                  full_ipd = TRUE, 
                                                                  anchored = TRUE, 
-                                                                 glm_family = glm_family)
+                                                                 outcome_family = glm_family)
   struct_results$regression$unanchored$glm <-  run_regression_model(trial_AC,
                                                                     trial_BC, 
                                                                     outcome_regression_model,
                                                                     covariate_names,
                                                                     full_ipd = TRUE, 
                                                                     anchored = FALSE, 
-                                                                    glm_family = glm_family)
+                                                                    outcome_family = glm_family)
 
   #################################################
   ########### PROPENSITY SCORE (both treatment IPD)
@@ -220,13 +214,15 @@ indirect_comparisons <- function(pop_init,
                                                           covariate_names, 
                                                           anchored = TRUE,
                                                           weight_estimation_method = "max_likelihood",
-                                                          studying_populations = FALSE)
+                                                          studying_populations = FALSE, 
+                                                          outcome_family = glm_family)
   struct_results$iptw$unanchored$ml <- run_propensity_score(trial_AC, 
                                                             trial_BC, 
                                                             covariate_names, 
                                                             anchored = FALSE,
                                                             weight_estimation_method = "max_likelihood",
-                                                            studying_populations = FALSE)
+                                                            studying_populations = FALSE, 
+                                                            outcome_family = glm_family)
 
   #########
   ### MAIC
@@ -236,12 +232,14 @@ indirect_comparisons <- function(pop_init,
                                                             covariate_names, 
                                                             anchored = TRUE,
                                                             weight_estimation_method = "moments",
+                                                            outcome_family = glm_family,
                                                             studying_populations = FALSE)
   struct_results$iptw$unanchored$maic <- run_propensity_score(trial_AC, 
                                                               trial_BC, 
                                                               covariate_names, 
                                                               anchored = FALSE,
                                                               weight_estimation_method = "moments",
+                                                              outcome_family = glm_family,
                                                               studying_populations = FALSE)
 
   ##########
@@ -253,14 +251,14 @@ indirect_comparisons <- function(pop_init,
                                                                  covariate_names,
                                                                  full_ipd = FALSE, 
                                                                  anchored = TRUE, 
-                                                                 glm_family = glm_family)
+                                                                 outcome_family = glm_family)
   struct_results$regression$unanchored$stc <- run_regression_model(trial_AC,
                                                                    trial_BC, 
                                                                    outcome_regression_model,
                                                                    covariate_names,
                                                                    full_ipd = FALSE, 
                                                                    anchored = FALSE, 
-                                                                   glm_family = glm_family)
+                                                                   outcome_family = glm_family)
 
 
   ##############################
@@ -303,11 +301,16 @@ list_covariate_names <- c(
   combn(c("X1", "X2"), m = 2, simplify = FALSE)
 ) |> as.vector()
 
-list_outcome_regression_models <- paste0("Y_obs ~ ", c(
-  "X1*ttt",
-  "X2*ttt",
-  "X1*ttt + X2*ttt"
-))
+# Manual specification of outcome regression models, automatic for now
+# list_outcome_regression_models <- c(
+#   "X1*ttt",
+#   "X2*ttt",
+#   "X1*ttt + X2*ttt"
+# )
+list_outcome_regression_models <- sapply(
+  list_covariate_names, 
+  \(li) sapply(li, \(x) paste0(x, "*ttt")) |> paste0(collapse = " + ")
+)
 
 df_estimators_parameters <- data.table(
   "covariate_names" = list_covariate_names,
@@ -327,52 +330,4 @@ df_estimators_parameters[, estimator_num := 1:.N]
 #   df_estimators_parameters, , on = "estimator_num"
 # ]
 
-
-
-###############
-### SIMULATIONS
-###############
-n_iter = 300
-time_start <- Sys.time()
-time_start_string <- format(time_start, "%Y%m%d_%H%M%S")
-print(time_start_string)
-experiment_results_directory <- file.path("results_simulations", time_start_string)
-if (!dir.exists(experiment_results_directory)) dir.create(experiment_results_directory)
-saveRDS(df_population_parameters, file.path(experiment_results_directory, "df_population_parameters.RDS"))
-saveRDS(df_estimators_parameters, file.path(experiment_results_directory, "df_estimators_parameters.RDS"))
-for (row_population in 1:nrow(df_population_parameters)) {
-  dir_sub_experiment <- file.path(experiment_results_directory, row_population)
-  dir.create(dir_sub_experiment)
-  list_simulation_parameters <- df_population_parameters[row_population, ] |> unlist()
-  population <- creating_population(list_simulation_parameters) # pop initiale
-  pop_init <- population$pop_init # données simulées
-  df_outcomes <- population$df_outcomes # outcome théorique par patient
-  average_outcome_df <- population$average_outcome_df # moyenne de ces outcomes (estimation empirique de l'effet marginal et conditionnel)
-
-  
-  saveRDS(average_outcome_df, file.path(dir_sub_experiment, "average_outcome_df.RDS"))
-  # Commented because huge file, so would take could much space if saved for every try 
-  # saveRDS(pop_init, file.path(dir_sub_experiment, "pop_init.RDS"))
-  
-  for (row_estimators in 1:nrow(df_estimators_parameters)) {
-    list_estimators_parameters <- df_estimators_parameters[row_estimators, ] |> unlist(recursive = FALSE)
-    results_simulations <- parallel::mclapply(1:n_iter, \(i) {
-      time_start_iteration <- Sys.time()
-      result_indirect_comparison <- indirect_comparisons(pop_init,
-                                                         df_outcomes,
-                                                         struct_results,
-                                                         N_BOOT_ITER,
-                                                         list_estimators_parameters[["N_RCT"]],
-                                                         list_estimators_parameters[["outcome_regression_model"]],
-                                                         list_estimators_parameters[["covariate_names"]])
-      time_eluded <- Sys.time() - time_start_iteration
-      cat("Experiment ", row_population, ".", row_estimators, ", Iteration ", i, ", length: ", time_eluded, " seconds\n", sep = "")
-      return(result_indirect_comparison)
-    })
-    saveRDS(results_simulations, file = file.path(dir_sub_experiment,
-                                                  paste0("experiment_", row_estimators, ".RDS")))
-  }
-}
-cat("Simulation length: ")
-print(Sys.time() - time_start)
 
