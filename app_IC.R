@@ -30,18 +30,26 @@ ui <- bs4DashPage(
   body = bs4DashBody(
     bs4TabItems(
       bs4TabItem(tabName = "results",
-                 bs4Card(
-                   uiOutput("dynamic_selectors")
+                 fluidRow(
+                   bs4Card(
+                     title = "Select Parameters",
+                     uiOutput("dynamic_selectors"), 
+                     width = 2
+                   ),
+                   bs4Card(width = 10, 
+                           title = "Covariates distributions",
+                           plotOutput("treatment_effect"), 
+                           plotOutput("covariates_distribution_Output"))
                  ),
                  bs4Card(
                    DT::dataTableOutput("selected_parameters"),
-                   width = 12
+                   title = "Selected Parameters",
+                   width = 12, 
+                   collapsed = TRUE
                  ),
                  bs4Card(width = 12, plotOutput("resultsPlot1")),
                  bs4Card(width = 12, plotOutput("resultsPlot2")),
                  bs4Card(width = 12, plotOutput("resultsPlot3")),
-                 bs4Card(width = 12, plotOutput("treatment_effect")),
-                 bs4Card(width = 12, plotOutput("covariates_distribution_Output"))
       )
     )
   ),
@@ -202,13 +210,17 @@ server <- function(input, output) {
     combined_results_df <- combined_results()
     result_plot <- combined_results_df |>
       dplyr::filter(estimator_num == chosen_estimator_num) |>
+      dplyr::mutate(data_type = ifelse(model %in% c("stc", "maic", "unadjusted"), 
+                                       "PAIC", "IPD") |> as.factor() |> relevel(ref = "PAIC"), 
+                    adjustment = relevel(as.factor(adjustment), ref = "unadjusted")) |> 
       dplyr::filter(variance < 20) |> # filtering absurd variance estimates for graphical exploration
       ggplot() +
       geom_rect(aes(xmin = -Inf, xmax = true_effect, ymin = true_effect, ymax = Inf), fill = "#A0D2AD", alpha = 0.02) +
       geom_rect(aes(xmin = -Inf, xmax = 0, ymin = 0, ymax = Inf), fill = "grey", alpha = 0.01) +
       geom_point(aes(x = lb, y = ub, color = anchored), alpha = 0.5) +
       geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "black") +
-      facet_wrap(~adjustment + model) +
+      # facet_wrap(~adjustment + model) +
+      facet_grid(data_type ~ adjustment) +
       labs(subtitle = paste("outcome regression model: ", outcome_regression_model, "\n",
                             "covariate names: ", covariate_names, sep = ""))
 

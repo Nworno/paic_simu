@@ -164,7 +164,10 @@ regression_model <- function(trial_AC,
                              anchored, 
                              full_ipd,
                              outcome_family) {
+  if (all(c("X1", "X2") %in% covariate_names) & bY_A_X1 == 1 & bY_A_X2 == 1 & ) browser()
+    
     if (full_ipd) {
+      # Classic IPD -->
       ### Classic regression model 
       df_full_ipd <- data.table::rbindlist(list("AC" = trial_AC, "BC" = trial_BC),
                                            idcol = "trial",

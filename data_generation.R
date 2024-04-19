@@ -27,6 +27,7 @@ df_population_parameters <- list(
   imbalanced_trial = c("AC", "BC"),
   imbalanced_trial_model = c(bquote(X1 * bT_X1 + X2 * bT_X2 + X3 * bT_X3 + X4 * bT_X4)), # Modèle d'attribution de l'essai AC
   balanced_trial_model = c(bquote(0)),  # Modèle d'attribution de l'essai BC
+  outcome_distribution = "normal",
   outcome_generation_formula =  c(bquote(
     bY_X1*X1 + bY_X2 * X2 + bY_X3 * X3 + bY_X4 * X4 + (bY_A + bY_A_X1*X1 + bY_A_X2*X2 + bY_A_X3*X3 + bY_A_X4*X4) * A +  bY_B*B + bY_C*C
   ))
@@ -102,7 +103,17 @@ creating_population <- function(list_simulation_parameters) {
     c("id" = list(1:nrow(pop_init))) |>
     as.data.table() |>
     melt(id.vars = c("id"), variable.name = "ttt", value.name = "Y_theo")
-  df_outcomes[, Y_obs := Y_theo + rnorm(n = length(Y_theo), mean = 0, sd = 1)]
+  if (outcome_distribution == "normal") {
+    df_outcomes[, Y_obs := Y_theo + rnorm(n = length(Y_theo), mean = 0, sd = 1)]
+  } else if (outcome_distribution == "binomial") {
+    df_outcomes[, Y_obs := rbinom(n = length(Y_obs), size = 1, prob = plogis(Y_theo))]
+    moy_outcomes <- tapply(df_outcomes$Y_obs, df_outcomes$ttt, mean, simplify = FALSE)
+    if (any(moy_outcomes < 0.02 | moy_outcomes > 0.98)) { # arbitrary thresholds, to avoid downstreams problem with model fitting
+      stop("Too extreme outcomes")
+    }
+  } else {
+    stop("Unknown outcome distribution")
+  }
 
   average_pop_init <- pop_init[, lapply(.SD, mean), .SDcols = covariate_names]
 
