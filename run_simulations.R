@@ -1,4 +1,4 @@
-options(mc.cores = 7)
+options(mc.cores = 1)
 
 source("estimators.R")
 source("data_generation.R")
@@ -7,8 +7,8 @@ source("data_generation.R")
 # Parameters
 ####################
 N_pop <- 10^6
-N_BOOT_ITER <- 50
-n_iter <- 50
+N_BOOT_ITER <- 4
+n_iter <- 3
 
 ###############
 ### SIMULATIONS
@@ -24,6 +24,7 @@ for (row_population in 1:nrow(df_population_parameters)) {
   dir_sub_experiment <- file.path(experiment_results_directory, row_population)
   dir.create(dir_sub_experiment)
   list_simulation_parameters <- df_population_parameters[row_population, ] |> unlist()
+  
   population <- creating_population(list_simulation_parameters) # pop initiale
   pop_init <- population$pop_init # données simulées
   df_outcomes <- population$df_outcomes # outcome théorique par patient

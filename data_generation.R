@@ -32,7 +32,7 @@ df_population_parameters <- list(
     bY_X1*X1 + bY_X2 * X2 + bY_X3 * X3 + bY_X4 * X4 + (bY_A + bY_A_X1*X1 + bY_A_X2*X2 + bY_A_X3*X3 + bY_A_X4*X4) * A +  bY_B*B + bY_C*C
   ))
 )  |> 
-  expand.grid() |>
+  expand.grid(stringsAsFactors = FALSE) |>
   as.data.table()
 df_population_parameters[, population_parameters_num := 1:.N]
 # df_population_parameters <- df_population_parameters[population_parameters_num == 6,]
