@@ -7,7 +7,6 @@ theme_update(panel.background = element_blank())
 ## Drawing distributions covariates
 ###################################
 library(data.table)
-# source("estimators.R")
 source("env_variables.R")
 source("data_generation.R")
 
@@ -17,7 +16,7 @@ source("data_generation.R")
 
 N_pop <- 10^5
 path_experiment <- file.path("results_simulations", DATE_EXPERIMENT)
-# df_population_parameters <- readRDS(file.path(path_experiment, "df_population_parameters.RDS"))
+df_population_parameters <- readRDS(file.path(path_experiment, "df_population_parameters.RDS"))
 
 for (num_population in df_population_parameters$population_parameters_num) {
   print(num_population)
@@ -40,24 +39,34 @@ for (num_population in df_population_parameters$population_parameters_num) {
     data.table::melt(measure.vars = patterns("X[0-9]+"), value.name = "variable_value", number = as.numerical) |>
     # Because they are the only variables used for now
     dplyr::filter(variable %in% c("X1", "X2")) |> 
-    dplyr::inner_join(populations$df_outcomes[, .(id, ttt, Y_obs)])
+    dplyr::inner_join(populations$df_outcomes[, .(id, ttt, Y_obs)]) |> 
+    dplyr::mutate(trial = ifelse(trial == "AC", "AC (IPD)", trial))
   
   plot_covariates_distribution <- all_individuals |>
     ggplot() +
     geom_density(aes(variable_value, fill = trial), alpha = 0.4) +
     facet_wrap(facets = "variable", scales = "free") +
-    labs(x = NULL, y = NULL) +
+    labs(x = NULL, y = NULL, title = "Covariates distributions") +
     theme(axis.text = element_blank(),
            axis.ticks = element_blank(),
            strip.text = element_text(size = 12))
+  saveRDS(plot_covariates_distribution, file.path(path_results_experiments, "covariates_distribution.RDS"))
+  ggsave(file.path(path_results_experiments, "covariates_distribution.png"),
+         plot = plot_covariates_distribution, width = 10, height = 5)
   
-  if (outcome_distribution == "normal") {
-  plot_outcome_distribution <- all_individuals |> 
-    ggplot() +
-    geom_density(aes(Y_obs, fill = ttt), alpha = 0.4) +
-    facet_wrap(facets = "trial", ncol = 1) + 
-    labs(x = NULL, y = NULL)
-  } else if (outcome_distribution == "binomial") {
+  if (list_simulation_parameters$outcome_distribution == "normal") {
+    plot_outcome_distribution <- all_individuals |> 
+      ggplot() +
+      # geom_density(aes(Y_obs, fill = ttt), alpha = 0.4) +
+      geom_violin(aes(ttt, Y_obs, fill = ttt), alpha = 0.4) +
+      geom_pointrange(aes(y = mean_Y_obs, x = ttt, ymin = low, ymax = up), color = "black", size = 1, 
+                      data = all_individuals |> 
+                        dplyr::group_by(trial, ttt) |>
+                        dplyr::summarise(mean_Y_obs = mean(Y_obs), sd_Y_obs = sd(Y_obs), low = mean_Y_obs - sd_Y_obs, up = mean_Y_obs + sd_Y_obs)) +
+      facet_wrap(facets = "trial", ncol = 2, scales = "free_x") + 
+      labs(x = NULL, y = NULL, title = "Outcome distribution")
+
+  } else if (list_simulation_parameters$outcome_distribution == "binomial") {
     # plot the distribution of the outcome as a barplot, with proportions of the outcome as stack bars for each treatment group
     plot_outcome_distribution <- all_individuals |> 
       dplyr::mutate(Y_obs = ifelse(Y_obs > 0, 1, 0), fill = ttt) |> 
@@ -71,11 +80,9 @@ for (num_population in df_population_parameters$population_parameters_num) {
       # geom_bar(aes(Y_obs, position = "dodge", alpha = 0.4) +
       facet_wrap(facets = "trial", ncol = 1, scales = "free") + 
       # geom_bar(aes(Y_obs, fill = trial), alpha = 0.4) +
-      labs(x = NULL, y = NULL)
+      labs(x = NULL, y = NULL, title = "Outcome distribution")
   }
-  saveRDS(plot_covariates_distribution, file.path(path_results_experiments, "covariates_distribution.RDS"))
-  ggsave(file.path(path_results_experiments, "covariates_distribution.png"),
-         plot = plot_covariates_distribution, width = 10, height = 5)
+  saveRDS(plot_outcome_distribution, file.path(path_results_experiments, "outcomes_distribution.RDS"))
   ggsave(file.path(path_results_experiments, "outcomes_distribution.png"),
          plot = plot_outcome_distribution, width = 10, height = 5)
 }

@@ -36,10 +36,21 @@ ui <- bs4DashPage(
                      uiOutput("dynamic_selectors"), 
                      width = 2
                    ),
-                   bs4Card(width = 10, 
-                           title = "Covariates distributions",
-                           plotOutput("treatment_effect"), 
-                           plotOutput("covariates_distribution_Output"))
+                   bs4TabCard(width = 10, 
+                              title = "Distributions",
+                              tabPanel(
+                                title = "Treatment effect",
+                                plotOutput("treatment_effect")
+                              ),
+                              tabPanel(
+                                title = "Outcome distribution",
+                                plotOutput("outcome_distribution_Output")
+                              ), 
+                              tabPanel(
+                                title = "Covariates distribution",
+                                plotOutput("covariates_distribution_Output")
+                              )
+                   )
                  ),
                  bs4Card(
                    DT::dataTableOutput("selected_parameters"),
@@ -47,9 +58,8 @@ ui <- bs4DashPage(
                    width = 12, 
                    collapsed = TRUE
                  ),
-                 bs4Card(width = 12, plotOutput("resultsPlot1")),
-                 bs4Card(width = 12, plotOutput("resultsPlot2")),
-                 bs4Card(width = 12, plotOutput("resultsPlot3")),
+                 uiOutput("results_box")
+
       )
     )
   ),
@@ -68,6 +78,7 @@ server <- function(input, output) {
   df_population_parameters <- readRDS(file.path(dir_simulations, "df_population_parameters.RDS"))
   df_estimators_parameters <- readRDS(file.path(dir_simulations, "df_estimators_parameters.RDS"))
 
+  df_stats <- readRDS(file.path(dir_simulations, "processed_results", "df_stats.RDS"))
   output$dynamic_selectors <- renderUI({
     names_parameters <- names(df_population_parameters)[names(df_population_parameters) != "population_parameters_num"]
     ui_elements <- lapply(names_parameters, function(column) {
@@ -124,15 +135,6 @@ server <- function(input, output) {
     })
   )
 
-  # output$num_experiment_picker <- renderUI({
-  #   selectInput("num_experiment",
-  #               "Experiment number",
-  #               choices = 1:nrow(df_population_parameters),
-  #               selected = 1)
-  # })
-  # bindEvent(input$num_experiment, x = reactive({print(input$num_experiment)}))
-
-  # 
   path_results_experiment <- reactive({
     req(num_experiment())
     print(num_experiment())
@@ -173,6 +175,14 @@ server <- function(input, output) {
       readRDS(file.path(path_results_experiment(), "covariates_distribution.RDS"))
     })
   )
+  output$outcome_distribution_Output <- bindEvent(
+    path_results_experiment(),
+    x = renderPlot({
+      readRDS(file.path(path_results_experiment(), "outcomes_distribution.RDS"))
+    })
+  )
+  
+  
   # output$covariates_distribution_Output <- renderImage({
   #   # Display the png file as a plot
   #   list(src = file.path(path_results_experiment(), "covariates_distribution.png"),
@@ -187,7 +197,6 @@ server <- function(input, output) {
     path_results_experiment(),
     x = renderPlot({
       true_treatment_effect <- readRDS(file.path(path_results_experiment(), "average_outcome_df.RDS"))[outcome_type == "conditional", AB]
-
       selected_row() |>
         # dplyr::filter(population_parameters_num == 1) |>
         dplyr::select(matches("bY.+X[12]")) |>
@@ -196,14 +205,16 @@ server <- function(input, output) {
         tidyr::pivot_longer(cols = everything(), names_to = "parameter", values_to = "value") |>
         ggplot() +
         geom_point(aes(y = parameter, x = value, color = parameter), size = 3) +
+        geom_segment(aes(y = parameter, xend = value, yend = parameter, color = parameter), arrow = arrow(length = unit(0.2, "inches"), type = "closed", angle = 15), arrow.fill = "black", x = 0, linetype = "solid") +
         geom_vline(xintercept = 0, linetype = "dashed", colour = "black") +
         geom_vline(xintercept = true_treatment_effect, linetype = "dashed", colour = "red") +
-        guides(color = "none")
+        guides(color = "none") +
+        labs(title = "Outcome model: covariates coefficient values")
     })
   )
 
 
-  renderPlotForEstimatorNum <- function(chosen_estimator_num) {
+  renderCIPlot <- function(chosen_estimator_num) {
     covariate_names <- df_estimators_parameters[chosen_estimator_num,]$covariate_names |> paste(collapse = " - ")
     outcome_regression_model <- df_estimators_parameters[chosen_estimator_num, ]$outcome_regression_model
     true_effect <- readRDS(file.path(path_results_experiment(), "average_outcome_df.RDS"))[outcome_type == "conditional", AB]
@@ -227,12 +238,85 @@ server <- function(input, output) {
     return(result_plot)
   }
 
+  renderPlotIndicators <- function(chosen_estimator_num) {
+    df_stats |> 
+      dplyr::filter(indicator != "correct_decision") |> 
+      dplyr::filter(Population_parameters_num == 1 &
+                      Estimator_num == 1) |>
+      dplyr::mutate(objective = ifelse(indicator %in% c("bias", "rmse"), 0, 
+                                       ifelse(indicator == "vr", 1, 
+                                              ifelse(indicator == "cov_95", 0.95, NA))), 
+                    Model = ifelse(Model %in% c("GLM", "ML"), "IPD", 
+                                   ifelse(Model == "Unadjusted", "", Model)), 
+                    Method = paste(Adjustment, Model, sep = ": ")) |> 
+      ggplot() +
+      facet_wrap(~indicator, scales = "free") +
+      geom_point(aes(y = Method, x = values, color = Anchored), size = 3.5, alpha = 0.6) +
+      geom_vline(aes(xintercept = objective), linetype = "dashed") +
+      theme_bw() +
+      theme(axis.text = element_text(size = 12), 
+            strip.text = element_text(size = 12)
+            )
+  }
+  
 
 
-  output$resultsPlot1 <- bindEvent(path_results_experiment(), x = renderPlot(renderPlotForEstimatorNum(1)))
-  output$resultsPlot2 <- bindEvent(path_results_experiment(), x = renderPlot(renderPlotForEstimatorNum(2)))
-  output$resultsPlot3 <- bindEvent(path_results_experiment(), x = renderPlot(renderPlotForEstimatorNum(3)))
+  output$CIPlot1 <- bindEvent(path_results_experiment(), x = renderPlot(renderCIPlot(1)))
+  output$CIPlot2 <- bindEvent(path_results_experiment(), x = renderPlot(renderCIPlot(2)))
+  output$CIPlot3 <- bindEvent(path_results_experiment(), x = renderPlot(renderCIPlot(3)))
+  
+  output$PlotIndicators1 <- bindEvent(path_results_experiment(),
+                                    x = renderPlot(renderPlotIndicators(1)))
+  output$PlotIndicators2 <- bindEvent(path_results_experiment(),
+                                    x = renderPlot(renderPlotIndicators(2)))
+  output$PlotIndicators3 <- bindEvent(path_results_experiment(),
+                                    x = renderPlot(renderPlotIndicators(3)))
+  
     
+  output$results_box <- renderUI(
+    tagList(
+    bs4TabCard(width = 12,
+               title = paste0("Estimator results: ", df_estimators_parameters[1,]$outcome_regression_model),
+               tabPanel(
+                 title = "CI", 
+                 closable = TRUE,
+                 plotOutput("CIPlot1")
+               ),
+               tabPanel(
+                 title = "Indicators",
+                 closable = TRUE,
+                 plotOutput("PlotIndicators1")
+               )
+    ),
+    bs4TabCard(width = 12,
+               title = paste0("Estimator results: ", df_estimators_parameters[2,]$outcome_regression_model),
+               tabPanel(
+                 title = "CI", 
+                 closable = TRUE,
+                 plotOutput("CIPlot2")
+               ),
+               tabPanel(
+                 title = "Indicators",
+                 closable = TRUE,
+                 plotOutput("PlotIndicators2")
+               )
+    ),
+    bs4TabCard(width = 12,
+               title = paste0("Estimator results: ", df_estimators_parameters[3,]$outcome_regression_model),
+               tabPanel(
+                 title = "CI", 
+                 closable = TRUE,
+                 plotOutput("CIPlot3")
+               ),
+               tabPanel(
+                 title = "Indicators",
+                 closable = TRUE,
+                 plotOutput("PlotIndicators3")
+               )
+    )
+    )
+  )
+  
 }
 
 shinyApp(ui = ui, server = server)
