@@ -33,6 +33,7 @@ for (num_population in df_population_parameters$population_parameters_num) {
   selected_individuals_BC <- pop_init[sample(id, N_RCT, replace = TRUE, prob = prob_w_trial_BC)][
     , ttt := rep_len(c("B", "C"), length.out = .N)]
   
+  #TODO Voir bug ici qui fait que ça n'est pas le bon graphique affiché dans l'app visiblement
   all_individuals <- data.table::rbindlist(list("AC" = selected_individuals_AC, "BC" = selected_individuals_BC),
                                            idcol = "trial") |>
     dplyr::mutate(across(tidyselect::matches("X[0-9]+"), as.double)) |>
@@ -47,9 +48,7 @@ for (num_population in df_population_parameters$population_parameters_num) {
     geom_density(aes(variable_value, fill = trial), alpha = 0.4) +
     facet_wrap(facets = "variable", scales = "free") +
     labs(x = NULL, y = NULL, title = "Covariates distributions") +
-    theme(axis.text = element_blank(),
-           axis.ticks = element_blank(),
-           strip.text = element_text(size = 12))
+    theme(strip.text = element_text(size = 12))
   saveRDS(plot_covariates_distribution, file.path(path_results_experiments, "covariates_distribution.RDS"))
   ggsave(file.path(path_results_experiments, "covariates_distribution.png"),
          plot = plot_covariates_distribution, width = 10, height = 5)
@@ -82,6 +81,10 @@ for (num_population in df_population_parameters$population_parameters_num) {
       # geom_bar(aes(Y_obs, fill = trial), alpha = 0.4) +
       labs(x = NULL, y = NULL, title = "Outcome distribution")
   }
+  if (num_population == 6) browser()
+  # print(plot_outcome_distribution)
+  print(num_population)
+  print(path_results_experiments)
   saveRDS(plot_outcome_distribution, file.path(path_results_experiments, "outcomes_distribution.RDS"))
   ggsave(file.path(path_results_experiments, "outcomes_distribution.png"),
          plot = plot_outcome_distribution, width = 10, height = 5)

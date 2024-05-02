@@ -1,6 +1,5 @@
 library(data.table)
 
-
 df_population_parameters <- list(
   prop_X1 = 0.5, # Variable binaire, prevalence dans la population
   bT_X1 = c(2),   # Effet de la variable binaire sur la probabilité d'être dans l'essai AC
@@ -10,7 +9,7 @@ df_population_parameters <- list(
   bY_X1 = 1.5,   # Effet de X1 sur l'outcome
   bY_X2 = 1,   # Effet de X2 sur l'outcome
   bY_X3 = 0,     # Effet de X3 sur l'outcome (inutile pour le moment)
-  bY_X4 = 0.5,     # Effet de X4 sur l'outcome
+  bY_X4 = 0,     # Effet de X4 sur l'outcome
   bY_A_X1 = c(0, 1), # Interaction A et X1 dans le modèle outcome
   bY_A_X2 = c(0, 1), # Interaction A et X2 dans le modèle outcome
   bY_A_X3 = c(0), # Interaction A et X3 dans le modèle outcome
@@ -25,6 +24,7 @@ df_population_parameters <- list(
   bY_B = 1.5,  # Effet de B par rapport à C
   bY_C = 0,    # Pas d'effet de C sur l'outcome
   imbalanced_trial = c("AC", "BC"),
+  # imbalanced_trial = c("AC"),
   imbalanced_trial_model = c(bquote(X1 * bT_X1 + X2 * bT_X2 + X3 * bT_X3 + X4 * bT_X4)), # Modèle d'attribution de l'essai AC
   balanced_trial_model = c(bquote(0)),  # Modèle d'attribution de l'essai BC
   outcome_distribution = "normal",
@@ -94,6 +94,38 @@ creating_population <- function(list_simulation_parameters) {
   pop_init[, prob_w_trial_BC := trial_assignement_prob(BC_trial_model, df = pop_init)]
 
   covariate_names <- c("X1", "X2", "X3", "X4")
+  # 1. Outcome has to be calculated for the BC trial (ie target trial) --> explains the pervasive problems in the imbalanced trial BC, where the estimators target the BC trial, but theoretical is calculated in the overall population (ie the AC trial)
+  # 2. Looking that the estimate in the AC imbalanced trial estimations, it seems that the outcome is not calculated conditionnaly to the different parameters 
+    # Let's take for instance the scenario with bYA_X1 = 1, bYAX2 = 1, bTX2 = 1
+  # if (population_parameters_num == 6) browser()
+  # pop_AC <- pop_init[sample(id, 10**6, replace = TRUE, prob = prob_w_trial_AC)]
+  # pop_BC <- pop_init[sample(id, 10**6, replace = TRUE, prob = prob_w_trial_BC)]
+  # 
+  # ## AC
+  # YA = bY_X1 * mean(pop_AC$X1) + bY_X2 * mean(pop_AC$X2) + 0 * mean(pop_AC$X3) + 0 * mean(pop_AC$X4) + 
+  #   (bY_A +  bY_A_X1 * 
+  #      mean(pop_AC$X1) + bY_A_X2 * mean(pop_AC$X2) + bY_A_X3 * mean(pop_AC$X3) + bY_A_X4 * mean(pop_AC$X4)) * 1 + bY_B * 0 + bY_C * 0
+  # YB = bY_X1 * mean(pop_AC$X1) + bY_X2 * mean(pop_AC$X2) + 0 * mean(pop_AC$X3) + 0 * mean(pop_AC$X4) + 
+  #   (bY_A +  bY_A_X1 * 
+  #      mean(pop_AC$X1) + bY_A_X2 * mean(pop_AC$X2) + bY_A_X3 * mean(pop_AC$X3) + bY_A_X4 * mean(pop_AC$X4)) * 0 + bY_B * 1 + bY_C * 0
+  # YA - YB
+  # YC = bY_X1 * mean(pop_AC$X1) + bY_X2 * mean(pop_AC$X2) + 0 * mean(pop_AC$X3) + 0 * mean(pop_AC$X4) + 
+  #   (bY_A +  bY_A_X1 * 
+  #      mean(pop_AC$X1) + bY_A_X2 * mean(pop_AC$X2) + bY_A_X3 * mean(pop_AC$X3) + bY_A_X4 * mean(pop_AC$X4)) * 0 + bY_B * 0 + bY_C * 1
+  # ## BC
+  # YA = bY_X1 * mean(pop_BC$X1) + bY_X2 * mean(pop_BC$X2) + 0 * mean(pop_BC$X3) + 0 * mean(pop_BC$X4) + 
+  #   (bY_A +  bY_A_X1 * 
+  #      mean(pop_BC$X1) + bY_A_X2 * mean(pop_BC$X2) + bY_A_X3 * mean(pop_BC$X3) + bY_A_X4 * mean(pop_BC$X4)) * 1 + bY_B * 0 + bY_C * 0
+  # YB = bY_X1 * mean(pop_BC$X1) + bY_X2 * mean(pop_BC$X2) + 0 * mean(pop_BC$X3) + 0 * mean(pop_BC$X4) + 
+  #   (bY_A +  bY_A_X1 * 
+  #      mean(pop_BC$X1) + bY_A_X2 * mean(pop_BC$X2) + bY_A_X3 * mean(pop_BC$X3) + bY_A_X4 * mean(pop_BC$X4)) * 0 + bY_B * 1 + bY_C * 0
+  # YA - YB
+  # YC = bY_X1 * mean(pop_BC$X1) + bY_X2 * mean(pop_BC$X2) + 0 * mean(pop_BC$X3) + 0 * mean(pop_BC$X4) + 
+  #   (bY_A +  bY_A_X1 * 
+  #      mean(pop_BC$X1) + bY_A_X2 * mean(pop_BC$X2) + bY_A_X3 * mean(pop_BC$X3) + bY_A_X4 * mean(pop_BC$X4)) * 0 + bY_B * 0 + bY_C * 1
+  # 
+  
+  
   df_outcomes <- sapply(list(A = pop_init[, .(A = 1L, B = 0L, C = 0L, (.SD)), .SDcols = covariate_names],
                              B = pop_init[, .(A = 0L, B = 1L, C = 0L, (.SD)), .SDcols = covariate_names],
                              C = pop_init[, .(A = 0L, B = 0L, C = 1L, (.SD)), .SDcols = covariate_names]),
@@ -179,7 +211,7 @@ indirect_comparisons <- function(pop_init,
     , c("id", "ttt", "Y_obs")]
   trial_AC <- pop_init[selected_outcomes_AC, on = "id"][, ttt := factor(ttt, levels = c("C", "A"))]
 
-  selected_individuals_BC <- pop_init[sample(id, N_RCT, replace = FALSE, prob = prob_w_trial_BC)][
+  selected_individuals_BC <- pop_init[sample(id, N_RCT, replace = FALSE, prob = 1 - prob_w_trial_AC)][
       , ttt := rep_len(c("B", "C"), length.out = .N)]
   selected_outcomes_BC <- df_outcomes[selected_individuals_BC, on = c("id", "ttt")][
     , c("id", "ttt", "Y_obs")]

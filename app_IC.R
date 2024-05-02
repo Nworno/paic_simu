@@ -77,8 +77,18 @@ server <- function(input, output) {
   
   df_population_parameters <- readRDS(file.path(dir_simulations, "df_population_parameters.RDS"))
   df_estimators_parameters <- readRDS(file.path(dir_simulations, "df_estimators_parameters.RDS"))
-
-  df_stats <- readRDS(file.path(dir_simulations, "processed_results", "df_stats.RDS"))
+  df_joined_results <- readRDS(file.path(dir_simulations, "processed_results", "joined_results.rds")) |> 
+    left_join(df_population_parameters, by = c("Population_parameters_num" = "population_parameters_num")) |>
+    dplyr::left_join(df_estimators_parameters, by = c("Estimator_num" = "estimator_num")) |>
+    mutate(lb = Estimate - qnorm(0.975) * sqrt(Variance), 
+           ub = Estimate + qnorm(0.975) * sqrt(Variance), 
+           includes_true_effect = (lb < True_effect) & (ub > True_effect), 
+           includes_0 = (lb < 0) & (ub > 0),
+           correct_decision = ifelse(True_effect == 0,
+                                     includes_0,
+                                     (sign(True_effect) == sign(Estimate)) & !includes_0) 
+    )
+  df_stats <- readRDS(file.path(dir_simulations, "processed_results", "df_stats.rds"))
   output$dynamic_selectors <- renderUI({
     names_parameters <- names(df_population_parameters)[names(df_population_parameters) != "population_parameters_num"]
     ui_elements <- lapply(names_parameters, function(column) {
@@ -95,29 +105,15 @@ server <- function(input, output) {
     do.call(tagList, list(ui_elements, go_button))
   })
   
-  # num_experiment <- reactive({
-  #   unique(selected_row()[, population_parameters_num])
-  # })
-  # 
-  # 
-  
-  # observe({
-  #   input$go
-  #   print("oh yeah")
-  # })
-
   selected_row <- bindEvent(
     input$go,
     x = reactive({
-      print("oh yeah")
       filtered_df <- copy(df_population_parameters)
       for (parameter_input in names(input)[startsWith(names(input), "select_")]) {
         colname <- sub("select_", "", parameter_input, fixed = TRUE)
         filtered_df <- filtered_df[filtered_df[[colname]] == input[[parameter_input]], ]
       }
-      print(filtered_df)
       if(nrow(filtered_df) == 1) {
-        print("oh yeah")
         filtered_df
       } else {
         NULL # In case no row matches or multiple rows match, though your setup should prevent the latter
@@ -153,19 +149,8 @@ server <- function(input, output) {
   combined_results <- bindEvent(
     path_results_experiment(),
     x = reactive({
-      list_files <- list.files(path_results_experiment(), pattern = "experiment_.*.RDS", full.names = TRUE)
-      results_experiments <- lapply(list_files, function(file) readRDS(file))
-      results_experiments |>
-        lapply(dplyr::bind_rows) |>
-        dplyr::bind_rows(.id = "estimator_num") |>
-        # dplyr::group_by(estimator_num) |>
-        dplyr::mutate(lb = estimate - qnorm(0.975)*sqrt(variance),
-                      ub = estimate + qnorm(0.975)*sqrt(variance),
-                      includes_true_effect = (lb <= true_effect()) & (ub >= true_effect()),
-                      includes_0 = (lb <= 0) & (ub >= 0),
-                      correct_decision = (true_effect() == 0 & includes_0) |
-                        ((true_effect() != 0) & (sign(true_effect()) == sign(estimate)) & !includes_0)
-        )
+      df_joined_results |>
+        filter(Population_parameters_num == num_experiment())
     })
   )
   # 
@@ -199,7 +184,7 @@ server <- function(input, output) {
       true_treatment_effect <- readRDS(file.path(path_results_experiment(), "average_outcome_df.RDS"))[outcome_type == "conditional", AB]
       selected_row() |>
         # dplyr::filter(population_parameters_num == 1) |>
-        dplyr::select(matches("bY.+X[12]")) |>
+        dplyr::select(matches("bY.+X[12]"), bY_A, bY_B, bY_C) |>
         dplyr::mutate(conditional_AB_effect = true_treatment_effect) |>
         dplyr::mutate(across(everything(), as.double)) |>
         tidyr::pivot_longer(cols = everything(), names_to = "parameter", values_to = "value") |>
@@ -220,29 +205,31 @@ server <- function(input, output) {
     true_effect <- readRDS(file.path(path_results_experiment(), "average_outcome_df.RDS"))[outcome_type == "conditional", AB]
     combined_results_df <- combined_results()
     result_plot <- combined_results_df |>
-      dplyr::filter(estimator_num == chosen_estimator_num) |>
-      dplyr::mutate(data_type = ifelse(model %in% c("stc", "maic", "unadjusted"), 
+      dplyr::filter(Estimator_num == chosen_estimator_num) |>
+      dplyr::mutate(data_type = ifelse(Model %in% c("STC", "MAIC", "Unadjusted"), 
                                        "PAIC", "IPD") |> as.factor() |> relevel(ref = "PAIC"), 
-                    adjustment = relevel(as.factor(adjustment), ref = "unadjusted")) |> 
-      dplyr::filter(variance < 20) |> # filtering absurd variance estimates for graphical exploration
+                    Adjustment = relevel(as.factor(Adjustment), ref = "Unadjusted")) |> 
+      dplyr::filter(Variance < 20) |> # filtering absurd variance estimates for graphical exploration
       ggplot() +
-      geom_rect(aes(xmin = -Inf, xmax = true_effect, ymin = true_effect, ymax = Inf), fill = "#A0D2AD", alpha = 0.02) +
-      geom_rect(aes(xmin = -Inf, xmax = 0, ymin = 0, ymax = Inf), fill = "grey", alpha = 0.01) +
-      geom_point(aes(x = lb, y = ub, color = anchored), alpha = 0.5) +
+      annotate(geom = "rect", 
+               xmin = -Inf, xmax = 0, ymin = 0, ymax = Inf, fill = "grey", alpha = 0.3) +
+      annotate(geom = "rect",
+               xmin = -Inf, xmax = true_effect, ymin = true_effect, ymax = Inf, fill = "#A0D2AD", alpha = 0.5) +
+      geom_point(aes(x = lb, y = ub, color = Anchored), alpha = 0.5) +
       geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "black") +
       # facet_wrap(~adjustment + model) +
-      facet_grid(data_type ~ adjustment) +
+      facet_grid(data_type ~ Adjustment) +
       labs(subtitle = paste("outcome regression model: ", outcome_regression_model, "\n",
                             "covariate names: ", covariate_names, sep = ""))
 
     return(result_plot)
   }
 
-  renderPlotIndicators <- function(chosen_estimator_num) {
+  renderPlotIndicators <- function(num_experiment, chosen_estimator_num) {
     df_stats |> 
       dplyr::filter(indicator != "correct_decision") |> 
-      dplyr::filter(Population_parameters_num == 1 &
-                      Estimator_num == 1) |>
+      dplyr::filter(Population_parameters_num == num_experiment &
+                      Estimator_num == chosen_estimator_num) |>
       dplyr::mutate(objective = ifelse(indicator %in% c("bias", "rmse"), 0, 
                                        ifelse(indicator == "vr", 1, 
                                               ifelse(indicator == "cov_95", 0.95, NA))), 
@@ -266,11 +253,11 @@ server <- function(input, output) {
   output$CIPlot3 <- bindEvent(path_results_experiment(), x = renderPlot(renderCIPlot(3)))
   
   output$PlotIndicators1 <- bindEvent(path_results_experiment(),
-                                    x = renderPlot(renderPlotIndicators(1)))
+                                    x = renderPlot(renderPlotIndicators(num_experiment(), 1)))
   output$PlotIndicators2 <- bindEvent(path_results_experiment(),
-                                    x = renderPlot(renderPlotIndicators(2)))
+                                    x = renderPlot(renderPlotIndicators(num_experiment(), 2)))
   output$PlotIndicators3 <- bindEvent(path_results_experiment(),
-                                    x = renderPlot(renderPlotIndicators(3)))
+                                    x = renderPlot(renderPlotIndicators(num_experiment(), 3)))
   
     
   output$results_box <- renderUI(

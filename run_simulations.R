@@ -1,4 +1,4 @@
-options(mc.cores = 1)
+options(mc.cores = 3)
 
 source("estimators.R")
 source("data_generation.R")
@@ -7,8 +7,8 @@ source("data_generation.R")
 # Parameters
 ####################
 N_pop <- 10^6
-N_BOOT_ITER <- 4
-n_iter <- 3
+N_BOOT_ITER <- 10
+n_iter <- 200
 
 ###############
 ### SIMULATIONS

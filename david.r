@@ -7,11 +7,10 @@ library(ggthemr)
 library(patchwork)
 library(data.table)
 library(ggrepel)
-ggthemr::ggthemr("pale")
 
 source("processing_results.R")
 # View(classification_scenario)
-path_results <- file.path(dir_experience_results, "processed_results")
+path_results <- file.path("results_simulations", DATE_EXPERIMENT, "processed_results")
 
 get_bias <- function(obs, theo) {
   mean(obs - theo, na.rm = FALSE)
