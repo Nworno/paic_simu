@@ -81,7 +81,6 @@ for (num_population in df_population_parameters$population_parameters_num) {
       # geom_bar(aes(Y_obs, fill = trial), alpha = 0.4) +
       labs(x = NULL, y = NULL, title = "Outcome distribution")
   }
-  if (num_population == 6) browser()
   # print(plot_outcome_distribution)
   print(num_population)
   print(path_results_experiments)

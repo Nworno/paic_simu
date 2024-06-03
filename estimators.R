@@ -91,6 +91,10 @@ propensity_score <- function(trial_AC,
     } else {
       stop("No weight estimation method provided")
     }
+    if (studying_populations) {
+      print("oh yeah")
+      return(trial_weights)
+    }
     if (outcome_family$family == "binomial") {
       df$y_0 <- 1 - df$Y_obs
       outcome_model <- as.formula(cbind(Y_obs, y_0) ~ ttt + trial)
@@ -117,6 +121,11 @@ propensity_score <- function(trial_AC,
     } else {
       stop("No weighting method provided")
     }
+    if (studying_populations) {
+      print("oh yeah")
+      return(trial_weights)
+    }
+    
     df[, ttt := relevel(as.factor(ttt), ref = "B")]
     stopifnot(levels(df$ttt)[[1]] == "B")
     if (outcome_family$family == "binomial") {

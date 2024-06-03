@@ -92,6 +92,7 @@ creating_population <- function(list_simulation_parameters) {
 
   pop_init[, prob_w_trial_AC := trial_assignement_prob(AC_trial_model, df = pop_init)]
   pop_init[, prob_w_trial_BC := trial_assignement_prob(BC_trial_model, df = pop_init)]
+  pop_BC <- pop_init[sample(id, 10**6, replace = TRUE, prob = prob_w_trial_BC)]
 
   covariate_names <- c("X1", "X2", "X3", "X4")
   # 1. Outcome has to be calculated for the BC trial (ie target trial) --> explains the pervasive problems in the imbalanced trial BC, where the estimators target the BC trial, but theoretical is calculated in the overall population (ie the AC trial)
@@ -99,7 +100,6 @@ creating_population <- function(list_simulation_parameters) {
     # Let's take for instance the scenario with bYA_X1 = 1, bYAX2 = 1, bTX2 = 1
   # if (population_parameters_num == 6) browser()
   # pop_AC <- pop_init[sample(id, 10**6, replace = TRUE, prob = prob_w_trial_AC)]
-  # pop_BC <- pop_init[sample(id, 10**6, replace = TRUE, prob = prob_w_trial_BC)]
   # 
   # ## AC
   # YA = bY_X1 * mean(pop_AC$X1) + bY_X2 * mean(pop_AC$X2) + 0 * mean(pop_AC$X3) + 0 * mean(pop_AC$X4) + 
@@ -126,9 +126,9 @@ creating_population <- function(list_simulation_parameters) {
   # 
   
   
-  df_outcomes <- sapply(list(A = pop_init[, .(A = 1L, B = 0L, C = 0L, (.SD)), .SDcols = covariate_names],
-                             B = pop_init[, .(A = 0L, B = 1L, C = 0L, (.SD)), .SDcols = covariate_names],
-                             C = pop_init[, .(A = 0L, B = 0L, C = 1L, (.SD)), .SDcols = covariate_names]),
+  df_outcomes_BC <- sapply(list(A = pop_BC[, .(A = 1L, B = 0L, C = 0L, (.SD)), .SDcols = covariate_names],
+                             B = pop_BC[, .(A = 0L, B = 1L, C = 0L, (.SD)), .SDcols = covariate_names],
+                             C = pop_BC[, .(A = 0L, B = 0L, C = 1L, (.SD)), .SDcols = covariate_names]),
                         predict_outcome,
                         outcome_model = outcome_generation_formula,
                         simplify = FALSE) |>
@@ -136,10 +136,10 @@ creating_population <- function(list_simulation_parameters) {
     as.data.table() |>
     melt(id.vars = c("id"), variable.name = "ttt", value.name = "Y_theo")
   if (outcome_distribution == "normal") {
-    df_outcomes[, Y_obs := Y_theo + rnorm(n = length(Y_theo), mean = 0, sd = 1)]
+    df_outcomes_BC[, Y_obs := Y_theo + rnorm(n = length(Y_theo), mean = 0, sd = 1)]
   } else if (outcome_distribution == "binomial") {
-    df_outcomes[, Y_obs := rbinom(n = length(Y_obs), size = 1, prob = plogis(Y_theo))]
-    moy_outcomes <- tapply(df_outcomes$Y_obs, df_outcomes$ttt, mean, simplify = FALSE)
+    df_outcomes_BC[, Y_obs := rbinom(n = length(Y_obs), size = 1, prob = plogis(Y_theo))]
+    moy_outcomes <- tapply(df_outcomes_BC$Y_obs, df_outcomes_BC$ttt, mean, simplify = FALSE)
     if (any(moy_outcomes < 0.02 | moy_outcomes > 0.98)) { # arbitrary thresholds, to avoid downstreams problem with model fitting
       stop("Too extreme outcomes")
     }
@@ -147,20 +147,20 @@ creating_population <- function(list_simulation_parameters) {
     stop("Unknown outcome distribution")
   }
 
-  average_pop_init <- pop_init[, lapply(.SD, mean), .SDcols = covariate_names]
+  average_pop_BC <- pop_BC[, lapply(.SD, mean), .SDcols = covariate_names]
 
-  average_conditional_outcome <- sapply(list("A" = average_pop_init[, .(A = 1L, B = 0L, C = 0L, (.SD)), .SDcols = covariate_names],
-                                             "B" = average_pop_init[, .(A = 0L, B = 1L, C = 0L, (.SD)), .SDcols = covariate_names],
-                                             "C" = average_pop_init[, .(A = 0L, B = 0L, C = 1L, (.SD)), .SDcols = covariate_names]),
+  average_conditional_outcome_BC <- sapply(list("A" = average_pop_BC[, .(A = 1L, B = 0L, C = 0L, (.SD)), .SDcols = covariate_names],
+                                             "B" = average_pop_BC[, .(A = 0L, B = 1L, C = 0L, (.SD)), .SDcols = covariate_names],
+                                             "C" = average_pop_BC[, .(A = 0L, B = 0L, C = 1L, (.SD)), .SDcols = covariate_names]),
                                         predict_outcome,
                                         outcome_model = outcome_generation_formula,
                                         simplify = FALSE) |>
     as.data.table() |>
     melt(measure.vars = c("A", "B", "C"), variable.name = "ttt", value.name = "outcome")
-  marginal_outcome <- df_outcomes[, .(outcome = mean(Y_obs)), by = c("ttt")]
+  marginal_outcome_BC <- df_outcomes_BC[, .(outcome = mean(Y_obs)), by = c("ttt")]
   average_outcome_df <- rbindlist(
-    list("conditional" = average_conditional_outcome,
-         "marginal" = marginal_outcome),
+    list("conditional" = average_conditional_outcome_BC,
+         "marginal" = marginal_outcome_BC),
     use.names = TRUE,
     idcol = "outcome_type") |>
     dcast(outcome_type ~ ttt, value.var = "outcome")
@@ -186,7 +186,7 @@ creating_population <- function(list_simulation_parameters) {
   detach(list_simulation_parameters)
   return(list(
     "pop_init" = pop_init,
-    "df_outcomes" = df_outcomes,
+    "df_outcomes" = df_outcomes_BC,
     "average_outcome_df" = average_outcome_df
   ))
 }
