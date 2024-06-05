@@ -1,5 +1,9 @@
 library(data.table)
 
+##############################################
+########### Data Generation Parameters
+##############################################
+
 df_population_parameters <- list(
   prop_X1 = 0.5, # Variable binaire, prevalence dans la population
   bT_X1 = c(2),   # Effet de la variable binaire sur la probabilité d'être dans l'essai AC
@@ -15,6 +19,7 @@ df_population_parameters <- list(
   bY_A_X3 = c(0), # Interaction A et X3 dans le modèle outcome
   bY_A_X4 = c(0), # Interaction A et X4 dans le modèle outcome
   binary_marker = c(bquote(rbinom(N_pop, 1, 0.5))), # Utilisé pour la variable bimodale
+  f_X1 = c(bquote(rnorm(N_pop, -2, 1))), # distribution de X1 (revoir car il faudrait utiliser prop_X1)
   f_X1 = c(bquote(rnorm(N_pop, -2, 1))), # distribution de X1 (revoir car il faudrait utiliser prop_X1)
   f_X2 = c(bquote(binary_marker * rnorm(N_pop, -2, 1) + (1 - binary_marker) * rnorm(N_pop, 2, 1))), # distribution de X2
   f_X3 = c(bquote(0)), # inutile pour le moment
@@ -37,23 +42,35 @@ df_population_parameters <- list(
 df_population_parameters[, population_parameters_num := 1:.N]
 # df_population_parameters <- df_population_parameters[population_parameters_num == 6,]
 
-######### Models
-##################
-## Note David: we could have
-## one binary variable X1
-## one continuous variable X2
-## one parameter to switch the binary variable between prognostic only (bYA_X1 = 0) or effect modifier (bYA_X1 != 0)
-## one parameter to switch the continuous variable between prognostic only (bYA_X2Ò = 0) or effect modifier (bYA_X2 != 0)
-## one parameter to switch the continuous variable distribution: normal (symmetrical) or lognormal (asymmetrical)
-## Overall, 8 scenarios here
-##
-## Then, run all estimators. For estimators taking into accounts covariates, run three estimations:
-## - only X1
-## - only X2
-## - both X1 and X2
-## For estimators taking into accounts moments, run with (to be discussed):
-## - first moment only
-## - first and second moments
+df_population_parameters <- list(
+  # prop_X1 = 0.5, # Variable binaire, prevalence dans la population
+  bT_X1 = c(0),   # Effet de la variable sur la probabilité d'être dans l'essai BC
+  bT_X2 = c(0),   # Effet de la variable continue X2...
+  bY_X1 = c(0),   # Effet de X1 sur l'outcome
+  bY_X2 = c(0),   # Effet de X2 sur l'outcome
+  bY_A_X1 = c(0), # Interaction A et X1 dans le modèle outcome
+  bY_A_X2 = c(0), # Interaction A et X2 dans le modèle outcome
+  # binary_marker = c(bquote(rbinom(N_pop, 1, 0.5))), # Utilisé pour la variable bimodale
+  f_X1 = c(bquote(rnorm(N_pop, 1, 1))), 
+  f_X2 = c(bquote(rnorm(N_pop, 1, 1))), # distribution de X2
+  bY_A = 1.5,  # Effet de A par rapport à C
+  bY_B = 1.5,  # Effet de B par rapport à C
+  bY_C = 0,    # Pas d'effet de C sur l'outcome
+  imbalanced_trial = c("BC"),
+  # imbalanced_trial = c("AC"),
+  imbalanced_trial_model = c(bquote(X1 * bT_X1 + X2 * bT_X2 )), # Modèle d'attribution de l'essai AC
+  balanced_trial_model = c(bquote(0)),  # Modèle d'attribution de l'essai BC
+  outcome_distribution = "normal",
+  outcome_generation_formula =  c(bquote(
+    bY_X1*X1 + bY_X2 * X2 +  (bY_A + bY_A_X1*X1 + bY_A_X2*X2) * A +  bY_B*B + bY_C*C
+  ))
+)  |> 
+  expand.grid(stringsAsFactors = FALSE) |>
+  as.data.table()
+df_population_parameters[, population_parameters_num := 1:.N]
+# df_population_parameters <- df_population_parameters[population_parameters_num == 6,]
+
+
 
 ##############################################
 ########### Creating an overarching population
@@ -92,7 +109,8 @@ creating_population <- function(list_simulation_parameters) {
 
   pop_init[, prob_w_trial_AC := trial_assignement_prob(AC_trial_model, df = pop_init)]
   pop_init[, prob_w_trial_BC := trial_assignement_prob(BC_trial_model, df = pop_init)]
-  pop_BC <- pop_init[sample(id, 10**6, replace = TRUE, prob = prob_w_trial_BC)]
+  pop_BC <- pop_init[sample(id, N_pop, replace = TRUE, prob = prob_w_trial_BC)] # one patient could be represented multiple times, but with such large sample sizes the correlation should not matter at all
+  pop_AC <- pop_init[sample(id, N_pop, replace = TRUE, prob = prob_w_trial_BC)] # one patient could be represented multiple times, but with such large sample sizes the correlation should not matter at all
 
   covariate_names <- c("X1", "X2", "X3", "X4")
   # 1. Outcome has to be calculated for the BC trial (ie target trial) --> explains the pervasive problems in the imbalanced trial BC, where the estimators target the BC trial, but theoretical is calculated in the overall population (ie the AC trial)
@@ -125,20 +143,24 @@ creating_population <- function(list_simulation_parameters) {
   #      mean(pop_BC$X1) + bY_A_X2 * mean(pop_BC$X2) + bY_A_X3 * mean(pop_BC$X3) + bY_A_X4 * mean(pop_BC$X4)) * 0 + bY_B * 0 + bY_C * 1
   # 
   
+  all_individuals <- data.table::rbindlist(list("BC" = pop_BC, "AC" = pop_AC), use.names = TRUE, idcol = 'trial')
   
-  df_outcomes_BC <- sapply(list(A = pop_BC[, .(A = 1L, B = 0L, C = 0L, (.SD)), .SDcols = covariate_names],
-                             B = pop_BC[, .(A = 0L, B = 1L, C = 0L, (.SD)), .SDcols = covariate_names],
-                             C = pop_BC[, .(A = 0L, B = 0L, C = 1L, (.SD)), .SDcols = covariate_names]),
-                        predict_outcome,
-                        outcome_model = outcome_generation_formula,
-                        simplify = FALSE) |>
-    c("id" = list(1:nrow(pop_init))) |>
+  df_outcomes_all_individuals <- sapply(list(A = all_individuals[, .(A = 1L, B = 0L, C = 0L, (.SD)), .SDcols = covariate_names],
+                                             B = all_individuals[, .(A = 0L, B = 1L, C = 0L, (.SD)), .SDcols = covariate_names],
+                                             C = all_individuals[, .(A = 0L, B = 0L, C = 1L, (.SD)), .SDcols = covariate_names]),
+                                        predict_outcome,
+                                        outcome_model = outcome_generation_formula,
+                                        simplify = FALSE) |>
+    c("id" =  list(all_individuals$id), 
+      "trial" = list(all_individuals$trial)) |>
     as.data.table() |>
-    melt(id.vars = c("id"), variable.name = "ttt", value.name = "Y_theo")
+    melt(id.vars = c("id", "trial"), variable.name = "ttt", value.name = "Y_theo")
+  
+  
   if (outcome_distribution == "normal") {
-    df_outcomes_BC[, Y_obs := Y_theo + rnorm(n = length(Y_theo), mean = 0, sd = 1)]
+    df_outcomes_all_individuals[, Y_obs := Y_theo + rnorm(n = length(Y_theo), mean = 0, sd = 1)]
   } else if (outcome_distribution == "binomial") {
-    df_outcomes_BC[, Y_obs := rbinom(n = length(Y_obs), size = 1, prob = plogis(Y_theo))]
+    df_outcomes_all_individuals[, Y_obs := rbinom(n = length(Y_obs), size = 1, prob = plogis(Y_theo))]
     moy_outcomes <- tapply(df_outcomes_BC$Y_obs, df_outcomes_BC$ttt, mean, simplify = FALSE)
     if (any(moy_outcomes < 0.02 | moy_outcomes > 0.98)) { # arbitrary thresholds, to avoid downstreams problem with model fitting
       stop("Too extreme outcomes")
@@ -147,23 +169,24 @@ creating_population <- function(list_simulation_parameters) {
     stop("Unknown outcome distribution")
   }
 
-  average_pop_BC <- pop_BC[, lapply(.SD, mean), .SDcols = covariate_names]
+  average_all_individuals <- all_individuals[, lapply(.SD, mean), .SDcols = covariate_names, by = trial]
 
-  average_conditional_outcome_BC <- sapply(list("A" = average_pop_BC[, .(A = 1L, B = 0L, C = 0L, (.SD)), .SDcols = covariate_names],
-                                             "B" = average_pop_BC[, .(A = 0L, B = 1L, C = 0L, (.SD)), .SDcols = covariate_names],
-                                             "C" = average_pop_BC[, .(A = 0L, B = 0L, C = 1L, (.SD)), .SDcols = covariate_names]),
-                                        predict_outcome,
-                                        outcome_model = outcome_generation_formula,
-                                        simplify = FALSE) |>
+  average_conditional_outcome_all_individuals <- sapply(list("A" = average_all_individuals[, .(A = 1L, B = 0L, C = 0L, (.SD)), .SDcols = covariate_names],
+                                                             "B" = average_all_individuals[, .(A = 0L, B = 1L, C = 0L, (.SD)), .SDcols = covariate_names],
+                                                             "C" = average_all_individuals[, .(A = 0L, B = 0L, C = 1L, (.SD)), .SDcols = covariate_names]),
+                                                        predict_outcome,
+                                                        outcome_model = outcome_generation_formula,
+                                                        simplify = FALSE) |>
+    c("trial" = list(average_all_individuals$trial)) |> 
     as.data.table() |>
     melt(measure.vars = c("A", "B", "C"), variable.name = "ttt", value.name = "outcome")
-  marginal_outcome_BC <- df_outcomes_BC[, .(outcome = mean(Y_obs)), by = c("ttt")]
+  marginal_outcome_all_individuals <- df_outcomes_all_individuals[, .(outcome = mean(Y_obs)), by = c("trial", "ttt")]
   average_outcome_df <- rbindlist(
-    list("conditional" = average_conditional_outcome_BC,
-         "marginal" = marginal_outcome_BC),
+    list("conditional" = average_conditional_outcome_all_individuals,
+         "marginal" = marginal_outcome_all_individuals),
     use.names = TRUE,
     idcol = "outcome_type") |>
-    dcast(outcome_type ~ ttt, value.var = "outcome")
+    dcast(trial + outcome_type ~ ttt, value.var = "outcome")
   average_outcome_df[, AB := A - B]
   # population_variance <- df_outcomes[, .(var_Y_obs = var(Y_obs)), by = c("ttt")] |> 
   #   dcast(. ~ ttt, value.var = "var_Y_obs") |> 
@@ -181,12 +204,12 @@ creating_population <- function(list_simulation_parameters) {
   # Correcting theoretical marginal effect, so that it is set to 0 when there is actually
   # no difference between theoretical conditional and marginal, as it should be
   # Useful to quantify estimators alpha and beta nominal risk level 
-  if (average_outcome_df[outcome_type == "conditional", AB] == 0) average_outcome_df[, AB := 0]
+  # if (average_outcome_df[outcome_type == "conditional", AB] == 0) average_outcome_df[, AB := 0]
 
   detach(list_simulation_parameters)
   return(list(
     "pop_init" = pop_init,
-    "df_outcomes" = df_outcomes_BC,
+    "df_outcomes" = df_outcomes_all_individuals,
     "average_outcome_df" = average_outcome_df
   ))
 }

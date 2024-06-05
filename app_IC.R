@@ -89,6 +89,7 @@ server <- function(input, output) {
                                      (sign(True_effect) == sign(Estimate)) & !includes_0) 
     )
   df_stats <- readRDS(file.path(dir_simulations, "processed_results", "df_stats.rds"))
+  browser()
   output$dynamic_selectors <- renderUI({
     names_parameters <- names(df_population_parameters)[names(df_population_parameters) != "population_parameters_num"]
     ui_elements <- lapply(names_parameters, function(column) {
@@ -116,7 +117,7 @@ server <- function(input, output) {
       if(nrow(filtered_df) == 1) {
         filtered_df
       } else {
-        NULL # In case no row matches or multiple rows match, though your setup should prevent the latter
+        NULL 
       }
     })
   )
