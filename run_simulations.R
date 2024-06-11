@@ -1,4 +1,4 @@
-options(mc.cores = 3)
+options(mc.cores = 1)
 
 source("estimators.R")
 source("data_generation.R")
@@ -7,8 +7,8 @@ source("data_generation.R")
 # Parameters
 ####################
 N_pop <- 10^6
-N_BOOT_ITER <- 5
-n_iter <- 400
+N_BOOT_ITER <- 3
+n_iter <- 4
 
 ###############
 ### SIMULATIONS
@@ -40,7 +40,6 @@ for (row_population in 1:nrow(df_population_parameters)) {
     results_simulations <- parallel::mclapply(1:n_iter, \(i) {
       time_start_iteration <- Sys.time()
       result_indirect_comparison <- indirect_comparisons(pop_init,
-                                                         df_outcomes,
                                                          struct_results,
                                                          N_BOOT_ITER,
                                                          list_estimators_parameters[["N_RCT"]],

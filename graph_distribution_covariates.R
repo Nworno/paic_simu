@@ -36,13 +36,13 @@ for (num_population in df_population_parameters$population_parameters_num) {
   selected_individuals_BC <- pop_init[sample(id, N_RCT, replace = TRUE, prob = prob_w_trial_BC)][
     , ttt := rep_len(c("B", "C"), length.out = .N)]
 
-  # all_individuals <- data.table::rbindlist(list("AC" = selected_individuals_AC, "BC" = selected_individuals_BC),
-  #                                          idcol = "trial") |>
-  #   dplyr::mutate(across(tidyselect::matches("X[0-9]+"), as.double)) |> 
-  #   data.table::melt(measure.vars = patterns("X[0-9]+"), value.name = "variable_value", number = as.numerical) |>
-  #   # Because they are the only variables used for now
-  #   dplyr::filter(variable %in% c("X1", "X2")) |> 
-  #   dplyr::mutate(trial = ifelse(trial == "AC", "AC (IPD)", trial))
+  all_individuals <- data.table::rbindlist(list("AC" = selected_individuals_AC, "BC" = selected_individuals_BC),
+                                           idcol = "trial") |>
+    dplyr::mutate(across(tidyselect::matches("X[0-9]+"), as.double)) |>
+    data.table::melt(measure.vars = patterns("X[0-9]+"), value.name = "variable_value", number = as.numerical) |>
+    # Because they are the only variables used for now
+    dplyr::filter(variable %in% c("X1", "X2")) |>
+    dplyr::mutate(trial = ifelse(trial == "AC", "AC (IPD)", trial))
 
   plot_covariates_distribution <- all_individuals |>
     ggplot() +
@@ -55,16 +55,17 @@ for (num_population in df_population_parameters$population_parameters_num) {
          plot = plot_covariates_distribution, width = 10, height = 5)
   
   if (list_simulation_parameters$outcome_distribution == "normal") {
-    plot_outcome_distribution <- populations$df_outcomes |> 
+    plot_outcome_distribution <- all_individuals |> 
       ggplot() +
       # geom_density(aes(Y_obs, fill = ttt), alpha = 0.4) +
       geom_violin(aes(ttt, Y_obs, fill = ttt), alpha = 0.4) +
       geom_pointrange(aes(y = mean_Y_obs, x = ttt, ymin = low, ymax = up), color = "black", size = 1, 
-                      data = populations$df_outcomes |> 
+                      data = all_individuals |> 
                         dplyr::group_by(trial, ttt) |>
                         dplyr::summarise(mean_Y_obs = mean(Y_obs), sd_Y_obs = sd(Y_obs), low = mean_Y_obs - sd_Y_obs, up = mean_Y_obs + sd_Y_obs)) +
       facet_wrap(facets = "trial", ncol = 2, scales = "free_x") + 
       labs(x = NULL, y = NULL, title = "Outcome distribution")
+    print(plot_outcome_distribution)
 
   } else if (list_simulation_parameters$outcome_distribution == "binomial") {
     # plot the distribution of the outcome as a barplot, with proportions of the outcome as stack bars for each treatment group

@@ -36,7 +36,7 @@ df_population_parameters <- list(
   outcome_generation_formula =  c(bquote(
     bY_X1*X1 + bY_X2 * X2 + bY_X3 * X3 + bY_X4 * X4 + (bY_A + bY_A_X1*X1 + bY_A_X2*X2 + bY_A_X3*X3 + bY_A_X4*X4) * A +  bY_B*B + bY_C*C
   ))
-)  |> 
+)  |>
   expand.grid(stringsAsFactors = FALSE) |>
   as.data.table()
 df_population_parameters[, population_parameters_num := 1:.N]
@@ -44,14 +44,14 @@ df_population_parameters[, population_parameters_num := 1:.N]
 
 df_population_parameters <- list(
   # prop_X1 = 0.5, # Variable binaire, prevalence dans la population
-  bT_X1 = c(0),   # Effet de la variable sur la probabilité d'être dans l'essai BC
-  bT_X2 = c(0),   # Effet de la variable continue X2...
+  bT_X1 = c(1),   # Effet de la variable sur la probabilité d'être dans l'essai BC
+  bT_X2 = c(1),   # Effet de la variable continue X2...
   bY_X1 = c(0),   # Effet de X1 sur l'outcome
   bY_X2 = c(0),   # Effet de X2 sur l'outcome
-  bY_A_X1 = c(0), # Interaction A et X1 dans le modèle outcome
-  bY_A_X2 = c(0), # Interaction A et X2 dans le modèle outcome
+  bY_A_X1 = c(1), # Interaction A et X1 dans le modèle outcome
+  bY_A_X2 = c(1), # Interaction A et X2 dans le modèle outcome
   # binary_marker = c(bquote(rbinom(N_pop, 1, 0.5))), # Utilisé pour la variable bimodale
-  f_X1 = c(bquote(rnorm(N_pop, 1, 1))), 
+  f_X1 = c(bquote(rnorm(N_pop, 1, 1))),
   f_X2 = c(bquote(rnorm(N_pop, 1, 1))), # distribution de X2
   bY_A = 1.5,  # Effet de A par rapport à C
   bY_B = 1.5,  # Effet de B par rapport à C
@@ -64,7 +64,7 @@ df_population_parameters <- list(
   outcome_generation_formula =  c(bquote(
     bY_X1*X1 + bY_X2 * X2 +  (bY_A + bY_A_X1*X1 + bY_A_X2*X2) * A +  bY_B*B + bY_C*C
   ))
-)  |> 
+)  |>
   expand.grid(stringsAsFactors = FALSE) |>
   as.data.table()
 df_population_parameters[, population_parameters_num := 1:.N]
@@ -79,6 +79,9 @@ df_population_parameters[, population_parameters_num := 1:.N]
 ## Génère une data.frame de 10^6 ou 7 lignes
 creating_population <- function(list_simulation_parameters) {
   attach(list_simulation_parameters)
+  print(list_simulation_parameters)
+
+
   if (imbalanced_trial == "AC") {
     BC_trial_model = balanced_trial_model  # Modèle d'attribution de l'essai BC
     AC_trial_model = imbalanced_trial_model
@@ -86,7 +89,7 @@ creating_population <- function(list_simulation_parameters) {
     BC_trial_model = imbalanced_trial_model
     AC_trial_model = balanced_trial_model
   }
-  
+
   binary_marker <- rbinom(N_pop, 1, 0.5)
   pop_init <- data.table(
     id = 1:N_pop,
@@ -109,66 +112,66 @@ creating_population <- function(list_simulation_parameters) {
 
   pop_init[, prob_w_trial_AC := trial_assignement_prob(AC_trial_model, df = pop_init)]
   pop_init[, prob_w_trial_BC := trial_assignement_prob(BC_trial_model, df = pop_init)]
-  pop_BC <- pop_init[sample(id, N_pop, replace = TRUE, prob = prob_w_trial_BC)] # one patient could be represented multiple times, but with such large sample sizes the correlation should not matter at all
-  pop_AC <- pop_init[sample(id, N_pop, replace = TRUE, prob = prob_w_trial_BC)] # one patient could be represented multiple times, but with such large sample sizes the correlation should not matter at all
-
   covariate_names <- c("X1", "X2", "X3", "X4")
+
   # 1. Outcome has to be calculated for the BC trial (ie target trial) --> explains the pervasive problems in the imbalanced trial BC, where the estimators target the BC trial, but theoretical is calculated in the overall population (ie the AC trial)
-  # 2. Looking that the estimate in the AC imbalanced trial estimations, it seems that the outcome is not calculated conditionnaly to the different parameters 
+  # 2. Looking that the estimate in the AC imbalanced trial estimations, it seems that the outcome is not calculated conditionnaly to the different parameters
     # Let's take for instance the scenario with bYA_X1 = 1, bYAX2 = 1, bTX2 = 1
   # if (population_parameters_num == 6) browser()
   # pop_AC <- pop_init[sample(id, 10**6, replace = TRUE, prob = prob_w_trial_AC)]
-  # 
+  #
   # ## AC
-  # YA = bY_X1 * mean(pop_AC$X1) + bY_X2 * mean(pop_AC$X2) + 0 * mean(pop_AC$X3) + 0 * mean(pop_AC$X4) + 
-  #   (bY_A +  bY_A_X1 * 
+  # YA = bY_X1 * mean(pop_AC$X1) + bY_X2 * mean(pop_AC$X2) + 0 * mean(pop_AC$X3) + 0 * mean(pop_AC$X4) +
+  #   (bY_A +  bY_A_X1 *
   #      mean(pop_AC$X1) + bY_A_X2 * mean(pop_AC$X2) + bY_A_X3 * mean(pop_AC$X3) + bY_A_X4 * mean(pop_AC$X4)) * 1 + bY_B * 0 + bY_C * 0
-  # YB = bY_X1 * mean(pop_AC$X1) + bY_X2 * mean(pop_AC$X2) + 0 * mean(pop_AC$X3) + 0 * mean(pop_AC$X4) + 
-  #   (bY_A +  bY_A_X1 * 
+  # YB = bY_X1 * mean(pop_AC$X1) + bY_X2 * mean(pop_AC$X2) + 0 * mean(pop_AC$X3) + 0 * mean(pop_AC$X4) +
+  #   (bY_A +  bY_A_X1 *
   #      mean(pop_AC$X1) + bY_A_X2 * mean(pop_AC$X2) + bY_A_X3 * mean(pop_AC$X3) + bY_A_X4 * mean(pop_AC$X4)) * 0 + bY_B * 1 + bY_C * 0
   # YA - YB
-  # YC = bY_X1 * mean(pop_AC$X1) + bY_X2 * mean(pop_AC$X2) + 0 * mean(pop_AC$X3) + 0 * mean(pop_AC$X4) + 
-  #   (bY_A +  bY_A_X1 * 
+  # YC = bY_X1 * mean(pop_AC$X1) + bY_X2 * mean(pop_AC$X2) + 0 * mean(pop_AC$X3) + 0 * mean(pop_AC$X4) +
+  #   (bY_A +  bY_A_X1 *
   #      mean(pop_AC$X1) + bY_A_X2 * mean(pop_AC$X2) + bY_A_X3 * mean(pop_AC$X3) + bY_A_X4 * mean(pop_AC$X4)) * 0 + bY_B * 0 + bY_C * 1
   # ## BC
-  # YA = bY_X1 * mean(pop_BC$X1) + bY_X2 * mean(pop_BC$X2) + 0 * mean(pop_BC$X3) + 0 * mean(pop_BC$X4) + 
-  #   (bY_A +  bY_A_X1 * 
+  # YA = bY_X1 * mean(pop_BC$X1) + bY_X2 * mean(pop_BC$X2) + 0 * mean(pop_BC$X3) + 0 * mean(pop_BC$X4) +
+  #   (bY_A +  bY_A_X1 *
   #      mean(pop_BC$X1) + bY_A_X2 * mean(pop_BC$X2) + bY_A_X3 * mean(pop_BC$X3) + bY_A_X4 * mean(pop_BC$X4)) * 1 + bY_B * 0 + bY_C * 0
-  # YB = bY_X1 * mean(pop_BC$X1) + bY_X2 * mean(pop_BC$X2) + 0 * mean(pop_BC$X3) + 0 * mean(pop_BC$X4) + 
-  #   (bY_A +  bY_A_X1 * 
+  # YB = bY_X1 * mean(pop_BC$X1) + bY_X2 * mean(pop_BC$X2) + 0 * mean(pop_BC$X3) + 0 * mean(pop_BC$X4) +
+  #   (bY_A +  bY_A_X1 *
   #      mean(pop_BC$X1) + bY_A_X2 * mean(pop_BC$X2) + bY_A_X3 * mean(pop_BC$X3) + bY_A_X4 * mean(pop_BC$X4)) * 0 + bY_B * 1 + bY_C * 0
   # YA - YB
-  # YC = bY_X1 * mean(pop_BC$X1) + bY_X2 * mean(pop_BC$X2) + 0 * mean(pop_BC$X3) + 0 * mean(pop_BC$X4) + 
-  #   (bY_A +  bY_A_X1 * 
+  # YC = bY_X1 * mean(pop_BC$X1) + bY_X2 * mean(pop_BC$X2) + 0 * mean(pop_BC$X3) + 0 * mean(pop_BC$X4) +
+  #   (bY_A +  bY_A_X1 *
   #      mean(pop_BC$X1) + bY_A_X2 * mean(pop_BC$X2) + bY_A_X3 * mean(pop_BC$X3) + bY_A_X4 * mean(pop_BC$X4)) * 0 + bY_B * 0 + bY_C * 1
-  # 
-  
-  all_individuals <- data.table::rbindlist(list("BC" = pop_BC, "AC" = pop_AC), use.names = TRUE, idcol = 'trial')
-  
-  df_outcomes_all_individuals <- sapply(list(A = all_individuals[, .(A = 1L, B = 0L, C = 0L, (.SD)), .SDcols = covariate_names],
-                                             B = all_individuals[, .(A = 0L, B = 1L, C = 0L, (.SD)), .SDcols = covariate_names],
-                                             C = all_individuals[, .(A = 0L, B = 0L, C = 1L, (.SD)), .SDcols = covariate_names]),
-                                        predict_outcome,
-                                        outcome_model = outcome_generation_formula,
-                                        simplify = FALSE) |>
-    c("id" =  list(all_individuals$id), 
-      "trial" = list(all_individuals$trial)) |>
+  #
+
+
+  df_outcomes_pop_init <- sapply(list(A = pop_init[, .(A = 1L, B = 0L, C = 0L, (.SD)), .SDcols = covariate_names],
+                                      B = pop_init[, .(A = 0L, B = 1L, C = 0L, (.SD)), .SDcols = covariate_names],
+                                      C = pop_init[, .(A = 0L, B = 0L, C = 1L, (.SD)), .SDcols = covariate_names]),
+                                 predict_outcome,
+                                 outcome_model = outcome_generation_formula,
+                                 simplify = FALSE) |>
+    c("id" =  list(pop_init$id),
+      "trial" = list(pop_init$trial)) |>
     as.data.table() |>
-    melt(id.vars = c("id", "trial"), variable.name = "ttt", value.name = "Y_theo")
-  
-  
+    melt(id.vars = c("id"), variable.name = "ttt", value.name = "Y_theo")
+
   if (outcome_distribution == "normal") {
-    df_outcomes_all_individuals[, Y_obs := Y_theo + rnorm(n = length(Y_theo), mean = 0, sd = 1)]
+    df_outcomes_pop_init[, Y_obs := Y_theo + rnorm(n = length(Y_theo), mean = 0, sd = 1)]
   } else if (outcome_distribution == "binomial") {
-    df_outcomes_all_individuals[, Y_obs := rbinom(n = length(Y_obs), size = 1, prob = plogis(Y_theo))]
-    moy_outcomes <- tapply(df_outcomes_BC$Y_obs, df_outcomes_BC$ttt, mean, simplify = FALSE)
+    df_outcomes_pop_init[, Y_obs := rbinom(n = length(Y_obs), size = 1, prob = plogis(Y_theo))]
+    moy_outcomes <- tapply(df_outcomes_pop_init$Y_obs, df_outcomes_pop_init$ttt, mean, simplify = FALSE)
     if (any(moy_outcomes < 0.02 | moy_outcomes > 0.98)) { # arbitrary thresholds, to avoid downstreams problem with model fitting
       stop("Too extreme outcomes")
     }
   } else {
     stop("Unknown outcome distribution")
   }
+  pop_init <- df_outcomes_pop_init[pop_init, on = "id"]
 
+  pop_BC <- pop_init[sample(id, N_pop, replace = TRUE, prob = prob_w_trial_BC)] # one patient could be represented multiple times, but with such large sample sizes the correlation should not matter at all
+  pop_AC <- pop_init[sample(id, N_pop, replace = TRUE, prob = prob_w_trial_BC)] # one patient could be represented multiple times, but with such large sample sizes the correlation should not matter at all
+  all_individuals <- data.table::rbindlist(list("BC" = pop_BC, "AC" = pop_AC), use.names = TRUE, idcol = 'trial')
   average_all_individuals <- all_individuals[, lapply(.SD, mean), .SDcols = covariate_names, by = trial]
 
   average_conditional_outcome_all_individuals <- sapply(list("A" = average_all_individuals[, .(A = 1L, B = 0L, C = 0L, (.SD)), .SDcols = covariate_names],
@@ -177,10 +180,10 @@ creating_population <- function(list_simulation_parameters) {
                                                         predict_outcome,
                                                         outcome_model = outcome_generation_formula,
                                                         simplify = FALSE) |>
-    c("trial" = list(average_all_individuals$trial)) |> 
+    c("trial" = list(average_all_individuals$trial)) |>
     as.data.table() |>
     melt(measure.vars = c("A", "B", "C"), variable.name = "ttt", value.name = "outcome")
-  marginal_outcome_all_individuals <- df_outcomes_all_individuals[, .(outcome = mean(Y_obs)), by = c("trial", "ttt")]
+  marginal_outcome_all_individuals <- all_individuals[, .(outcome = mean(Y_obs)), by = c("trial", "ttt")]
   average_outcome_df <- rbindlist(
     list("conditional" = average_conditional_outcome_all_individuals,
          "marginal" = marginal_outcome_all_individuals),
@@ -188,63 +191,53 @@ creating_population <- function(list_simulation_parameters) {
     idcol = "outcome_type") |>
     dcast(trial + outcome_type ~ ttt, value.var = "outcome")
   average_outcome_df[, AB := A - B]
-  # population_variance <- df_outcomes[, .(var_Y_obs = var(Y_obs)), by = c("ttt")] |> 
-  #   dcast(. ~ ttt, value.var = "var_Y_obs") |> 
-  #   dplyr::rename(var_population = `.`) |> 
+  # population_variance <- df_outcomes[, .(var_Y_obs = var(Y_obs)), by = c("ttt")] |>
+  #   dcast(. ~ ttt, value.var = "var_Y_obs") |>
+  #   dplyr::rename(var_population = `.`) |>
   #   dplyr::mutate(var_AB = A + B)
-  # 
+  #
   # df_outcomes |> ggplot() + geom_violin(aes(x = Y_obs, y = ttt))
   # diff_AB <- df_outcomes[ttt == "A", Y_obs] - df_outcomes[ttt == "B", Y_obs]
   # mean(diff_AB)
   # mean((diff_AB - mean(diff_AB))^2)
-  # 
+  #
   # average_outcome_df <- merge(average_outcome_df, population_variance, by = "ttt")
   # browser()
 
   # Correcting theoretical marginal effect, so that it is set to 0 when there is actually
   # no difference between theoretical conditional and marginal, as it should be
-  # Useful to quantify estimators alpha and beta nominal risk level 
+  # Useful to quantify estimators alpha and beta nominal risk level
   # if (average_outcome_df[outcome_type == "conditional", AB] == 0) average_outcome_df[, AB := 0]
 
   detach(list_simulation_parameters)
   return(list(
     "pop_init" = pop_init,
-    "df_outcomes" = df_outcomes_all_individuals,
     "average_outcome_df" = average_outcome_df
   ))
 }
 
 # méthodes de comparaison indirecte
 indirect_comparisons <- function(pop_init,
-                                 df_outcomes,
                                  struct_results,
                                  N_BOOT_ITER,
                                  N_RCT,
                                  outcome_regression_model,
-                                 covariate_names, 
-                                 glm_family = gaussian(link = "identity")) { 
+                                 covariate_names,
+                                 glm_family = gaussian(link = "identity")) {
 
   #############################
   ############## Drawing trials
   #############################
 
-  selected_individuals_AC <- pop_init[sample(id, N_RCT, replace = FALSE, prob = prob_w_trial_AC)][
-    , ttt := rep_len(c("A", "C"), length.out = .N)]
-  selected_outcomes_AC <- df_outcomes[selected_individuals_AC, on = c("id", "ttt")][
-    , c("id", "ttt", "Y_obs")]
-  trial_AC <- pop_init[selected_outcomes_AC, on = "id"][, ttt := factor(ttt, levels = c("C", "A"))]
+  trial_AC <- pop_init[sample(id, N_RCT, replace = TRUE, prob = prob_w_trial_AC)][
+    , ttt := rep_len(c("A", "C"), length.out = .N) |> factor(levels = c("C", "A"))]
+  stopifnot(levels(trial_AC$ttt)[[1]] == "C")
 
-  selected_individuals_BC <- pop_init[sample(id, N_RCT, replace = FALSE, prob = 1 - prob_w_trial_AC)][
-      , ttt := rep_len(c("B", "C"), length.out = .N)]
-  selected_outcomes_BC <- df_outcomes[selected_individuals_BC, on = c("id", "ttt")][
-    , c("id", "ttt", "Y_obs")]
-  trial_BC <- pop_init[selected_outcomes_BC, on = "id"][, ttt := factor(ttt, levels = c("C", "B"))]
+  trial_BC <- pop_init[sample(id, N_RCT, replace = TRUE, prob = 1 - prob_w_trial_AC)][
+      , ttt := rep_len(c("B", "C"), length.out = .N) |> factor(levels = c("C", "B"))]
+  stopifnot(levels(trial_BC$ttt)[[1]] == "C")
 
   average_trial_BC_covariates <- trial_BC[, lapply(.SD, mean), .SDcols = covariate_names]
-  # centered_trial_AC <- trial_AC[, mapply(`-`, .SD, average_trial_BC_covariates), .SDcols = covariate_names] |>
-  #   cbind(trial_AC[, .(ttt, Y_obs)])
-  # centered_trial_BC <- trial_BC[, mapply(`-`, .SD, average_trial_BC_covariates), .SDcols = covariate_names] |>
-  #   cbind(trial_BC[, .(ttt, Y_obs)])
 
   ###############################
   ########## Unadjusted estimator
@@ -255,54 +248,54 @@ indirect_comparisons <- function(pop_init,
   ##############################################################
   ########## REGRESSION BASED OUTCOME MODEL (both treatment IPD)
   ##############################################################
-  
+
   struct_results$regression$anchored$glm <- run_regression_model(trial_AC,
-                                                                 trial_BC, 
+                                                                 trial_BC,
                                                                  outcome_regression_model,
                                                                  covariate_names,
-                                                                 full_ipd = TRUE, 
-                                                                 anchored = TRUE, 
+                                                                 full_ipd = TRUE,
+                                                                 anchored = TRUE,
                                                                  outcome_family = glm_family)
   struct_results$regression$unanchored$glm <-  run_regression_model(trial_AC,
-                                                                    trial_BC, 
+                                                                    trial_BC,
                                                                     outcome_regression_model,
                                                                     covariate_names,
-                                                                    full_ipd = TRUE, 
-                                                                    anchored = FALSE, 
+                                                                    full_ipd = TRUE,
+                                                                    anchored = FALSE,
                                                                     outcome_family = glm_family)
 
   #################################################
   ########### PROPENSITY SCORE (both treatment IPD)
   #################################################
 
-  struct_results$iptw$anchored$ml <- run_propensity_score(trial_AC, 
-                                                          trial_BC, 
-                                                          covariate_names, 
+  struct_results$iptw$anchored$ml <- run_propensity_score(trial_AC,
+                                                          trial_BC,
+                                                          covariate_names,
                                                           anchored = TRUE,
                                                           weight_estimation_method = "max_likelihood",
-                                                          studying_populations = FALSE, 
+                                                          studying_populations = FALSE,
                                                           outcome_family = glm_family)
-  struct_results$iptw$unanchored$ml <- run_propensity_score(trial_AC, 
-                                                            trial_BC, 
-                                                            covariate_names, 
+  struct_results$iptw$unanchored$ml <- run_propensity_score(trial_AC,
+                                                            trial_BC,
+                                                            covariate_names,
                                                             anchored = FALSE,
                                                             weight_estimation_method = "max_likelihood",
-                                                            studying_populations = FALSE, 
+                                                            studying_populations = FALSE,
                                                             outcome_family = glm_family)
 
   #########
   ### MAIC
   #########
-  struct_results$iptw$anchored$maic <- run_propensity_score(trial_AC, 
-                                                            trial_BC, 
-                                                            covariate_names, 
+  struct_results$iptw$anchored$maic <- run_propensity_score(trial_AC,
+                                                            trial_BC,
+                                                            covariate_names,
                                                             anchored = TRUE,
                                                             weight_estimation_method = "moments",
                                                             outcome_family = glm_family,
                                                             studying_populations = FALSE)
-  struct_results$iptw$unanchored$maic <- run_propensity_score(trial_AC, 
-                                                              trial_BC, 
-                                                              covariate_names, 
+  struct_results$iptw$unanchored$maic <- run_propensity_score(trial_AC,
+                                                              trial_BC,
+                                                              covariate_names,
                                                               anchored = FALSE,
                                                               weight_estimation_method = "moments",
                                                               outcome_family = glm_family,
@@ -312,18 +305,18 @@ indirect_comparisons <- function(pop_init,
   ###### STC
   ##########
   struct_results$regression$anchored$stc <- run_regression_model(trial_AC,
-                                                                 trial_BC, 
+                                                                 trial_BC,
                                                                  outcome_regression_model,
                                                                  covariate_names,
-                                                                 full_ipd = FALSE, 
-                                                                 anchored = TRUE, 
+                                                                 full_ipd = FALSE,
+                                                                 anchored = TRUE,
                                                                  outcome_family = glm_family)
   struct_results$regression$unanchored$stc <- run_regression_model(trial_AC,
-                                                                   trial_BC, 
+                                                                   trial_BC,
                                                                    outcome_regression_model,
                                                                    covariate_names,
-                                                                   full_ipd = FALSE, 
-                                                                   anchored = FALSE, 
+                                                                   full_ipd = FALSE,
+                                                                   anchored = FALSE,
                                                                    outcome_family = glm_family)
 
 
@@ -374,7 +367,7 @@ list_covariate_names <- c(
 #   "X1*ttt + X2*ttt"
 # )
 list_outcome_regression_models <- sapply(
-  list_covariate_names, 
+  list_covariate_names,
   \(li) sapply(li, \(x) paste0(x, "*ttt")) |> paste0(collapse = " + ")
 )
 
