@@ -159,7 +159,7 @@ creating_population <- function(list_simulation_parameters) {
   if (outcome_distribution == "normal") {
     df_outcomes_pop_init[, Y_obs := Y_theo + rnorm(n = length(Y_theo), mean = 0, sd = 1)]
   } else if (outcome_distribution == "binomial") {
-    df_outcomes_pop_init[, Y_obs := rbinom(n = length(Y_obs), size = 1, prob = plogis(Y_theo))]
+    df_outcomes_pop_init[, Y_obs := rbinom(n = length(Y_theo), size = 1, prob = plogis(Y_theo))]
     moy_outcomes <- tapply(df_outcomes_pop_init$Y_obs, df_outcomes_pop_init$ttt, mean, simplify = FALSE)
     if (any(moy_outcomes < 0.02 | moy_outcomes > 0.98)) { # arbitrary thresholds, to avoid downstreams problem with model fitting
       stop("Too extreme outcomes")
@@ -168,7 +168,12 @@ creating_population <- function(list_simulation_parameters) {
     stop("Unknown outcome distribution")
   }
   pop_init <- df_outcomes_pop_init[pop_init, on = "id"]
+  # Required because the previous join doesn't preserve the key, and any sampling supposedly based on
+  # an integer key will be actually based on row number!
+  data.table::setkey(pop_init, id)
 
+
+  stopifnot(!is.null(data.table::key(pop_init)))
   pop_BC <- pop_init[sample(id, N_pop, replace = TRUE, prob = prob_w_trial_BC)] # one patient could be represented multiple times, but with such large sample sizes the correlation should not matter at all
   pop_AC <- pop_init[sample(id, N_pop, replace = TRUE, prob = prob_w_trial_BC)] # one patient could be represented multiple times, but with such large sample sizes the correlation should not matter at all
   all_individuals <- data.table::rbindlist(list("BC" = pop_BC, "AC" = pop_AC), use.names = TRUE, idcol = 'trial')
@@ -229,15 +234,17 @@ indirect_comparisons <- function(pop_init,
   ############## Drawing trials
   #############################
 
-  trial_AC <- pop_init[sample(id, N_RCT, replace = TRUE, prob = prob_w_trial_AC)][
-    , ttt := rep_len(c("A", "C"), length.out = .N) |> factor(levels = c("C", "A"))]
-  stopifnot(levels(trial_AC$ttt)[[1]] == "C")
+  trial_AC <- data.table::rbindlist(list(
+    pop_init[ttt == "A"][sample(id, N_RCT, replace = TRUE, prob = prob_w_trial_AC)],
+    pop_init[ttt == "C"][sample(id, N_RCT, replace = TRUE, prob = prob_w_trial_AC)]
+  ))[, ttt := factor(ttt, levels = c("C", "A"))]
+  trial_BC <- data.table::rbindlist(list(
+    pop_init[ttt == "B"][sample(id, N_RCT, replace = TRUE, prob = prob_w_trial_BC)],
+    pop_init[ttt == "C"][sample(id, N_RCT, replace = TRUE, prob = prob_w_trial_BC)]
+  ))[, ttt := factor(ttt, levels = c("C", "B"))]
 
-  trial_BC <- pop_init[sample(id, N_RCT, replace = TRUE, prob = 1 - prob_w_trial_AC)][
-      , ttt := rep_len(c("B", "C"), length.out = .N) |> factor(levels = c("C", "B"))]
-  stopifnot(levels(trial_BC$ttt)[[1]] == "C")
-
-  average_trial_BC_covariates <- trial_BC[, lapply(.SD, mean), .SDcols = covariate_names]
+  stopifnot(all(levels(trial_AC$ttt)[[1]] == "C",
+                levels(trial_BC$ttt)[[1]] == "C"))
 
   ###############################
   ########## Unadjusted estimator
