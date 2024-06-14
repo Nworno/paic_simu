@@ -10,12 +10,13 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       selectInput("outcome_distribution", "Outcome Distribution", choices = c("normal", "binomial")),
+      selectInput("with_replace", "Sampling with replacement", choices = c(TRUE, FALSE)),
       selectInput("imbalanced_trial", "Imbalanced Trial", choices = c("AC", "BC")),
       numericInput("bY_A", "bY_A", value = 1.5),
-      numericInput("bY_B", "bY_B", value = -1.5),
+      numericInput("bY_B", "bY_B", value = 1.5),
       numericInput("bY_C", "bY_C", value = 0),
-      numericInput("bT_X1", "bT_X1", value = 10),
-      numericInput("bT_X2", "bT_X2", value = -10),
+      numericInput("bT_X1", "bT_X1", value = 0),
+      numericInput("bT_X2", "bT_X2", value = 0 ),
       numericInput("bY_X1", "bY_X1", value = 0),
       numericInput("bY_X2", "bY_X2", value = 0),
       numericInput("bY_A_X1", "bY_A_X1", value = 0),
@@ -41,8 +42,8 @@ server <- function(input, output) {
 
   bindEvent(input$runSimulation,
             x = observe({
-              N_RCT <- 10000 # Example value, adjust based on your simulation setup
-              N_pop <- 10^5
+              N_RCT <- 5*10^4 # Example value, adjust based on your simulation setup
+              N_pop <- 5*10^5
               print(N_pop)
               print(N_RCT)
               list_simulation_parameters <- list(
@@ -72,15 +73,16 @@ server <- function(input, output) {
 
               populations <- creating_population(list_simulation_parameters)
               pop_init <- populations$pop_init
+
               selected_individuals_AC <- data.table::rbindlist(list(
-                pop_init[ttt == "A"][sample(id, N_RCT, replace = TRUE, prob = prob_w_trial_AC)],
-                pop_init[ttt == "B"][sample(id, N_RCT, replace = TRUE, prob = prob_w_trial_AC)],
-                pop_init[ttt == "C"][sample(id, N_RCT, replace = TRUE, prob = prob_w_trial_AC)]
+                pop_init[ttt == "A"][sample(id, N_RCT, replace = input$with_replace, prob = prob_w_trial_AC)],
+                pop_init[ttt == "B"][sample(id, N_RCT, replace = input$with_replace, prob = prob_w_trial_AC)],
+                pop_init[ttt == "C"][sample(id, N_RCT, replace = input$with_replace, prob = prob_w_trial_AC)]
               ))[, ttt := factor(ttt, levels = c("C", "B", "A"))]
               selected_individuals_BC <- data.table::rbindlist(list(
-                pop_init[ttt == "A"][sample(id, N_RCT, replace = TRUE, prob = prob_w_trial_BC)],
-                pop_init[ttt == "B"][sample(id, N_RCT, replace = TRUE, prob = prob_w_trial_BC)],
-                pop_init[ttt == "C"][sample(id, N_RCT, replace = TRUE, prob = prob_w_trial_BC)]
+                pop_init[ttt == "A"][sample(id, N_RCT, replace = input$with_replace, prob = prob_w_trial_BC)],
+                pop_init[ttt == "B"][sample(id, N_RCT, replace = input$with_replace, prob = prob_w_trial_BC)],
+                pop_init[ttt == "C"][sample(id, N_RCT, replace = input$with_replace, prob = prob_w_trial_BC)]
               ))[, ttt := factor(ttt, levels = c("C", "B", "A"))]
 
               stopifnot(all(levels(selected_individuals_AC$ttt)[[1]] == "C",
@@ -100,7 +102,10 @@ server <- function(input, output) {
                 dplyr::summarize(Y_obs = mean(Y_obs)) |>
                 tidyr::pivot_wider(names_from = "ttt", values_from = "Y_obs") |>
                 dplyr::mutate(AB = A - B)
-
+              browser()
+              true_propensity <- all_individuals |>
+                dplyr::select(trial, prob_w_trial_AC) |>
+                dplyr::group_by()
 
               plot_covariates_distribution <- all_individuals |>
                 ggplot() +
