@@ -9,6 +9,7 @@ ui <- fluidPage(
   titlePanel("Covariate Distribution in Trials"),
   sidebarLayout(
     sidebarPanel(
+      actionButton("runSimulation", "Run Simulation"),
       selectInput("outcome_distribution", "Outcome Distribution", choices = c("normal", "binomial")),
       selectInput("with_replace", "Sampling with replacement", choices = c(TRUE, FALSE)),
       selectInput("imbalanced_trial", "Imbalanced Trial", choices = c("AC", "BC")),
@@ -26,6 +27,7 @@ ui <- fluidPage(
       actionButton("runSimulation", "Run Simulation")
     ),
     mainPanel(
+      plotOutput("plot_propensity_distribution"),
       plotOutput("plot_covariates_distribution"),
       plotOutput("plot_outcome_distribution"),
       tableOutput("marginal_effect_table")
@@ -74,27 +76,15 @@ server <- function(input, output) {
               populations <- creating_population(list_simulation_parameters)
               pop_init <- populations$pop_init
 
-              selected_individuals_AC <- data.table::rbindlist(list(
-                pop_init[ttt == "A"][sample(id, N_RCT, replace = input$with_replace, prob = prob_w_trial_AC)],
-                pop_init[ttt == "B"][sample(id, N_RCT, replace = input$with_replace, prob = prob_w_trial_AC)],
-                pop_init[ttt == "C"][sample(id, N_RCT, replace = input$with_replace, prob = prob_w_trial_AC)]
-              ))[, ttt := factor(ttt, levels = c("C", "B", "A"))]
-              selected_individuals_BC <- data.table::rbindlist(list(
-                pop_init[ttt == "A"][sample(id, N_RCT, replace = input$with_replace, prob = prob_w_trial_BC)],
-                pop_init[ttt == "B"][sample(id, N_RCT, replace = input$with_replace, prob = prob_w_trial_BC)],
-                pop_init[ttt == "C"][sample(id, N_RCT, replace = input$with_replace, prob = prob_w_trial_BC)]
-              ))[, ttt := factor(ttt, levels = c("C", "B", "A"))]
 
-              stopifnot(all(levels(selected_individuals_AC$ttt)[[1]] == "C",
-                            levels(selected_individuals_BC$ttt)[[1]] == "C"))
               # Should subset the trials here based on whether anchored or not
-              all_individuals <- data.table::rbindlist(list("AC" = selected_individuals_AC, "BC" = selected_individuals_BC),
-                                                       idcol = "trial") |>
-                dplyr::mutate(across(tidyselect::matches("X[0-9]+"), as.double)) |>
+              stopifnot(levels(pop_init$ttt)[[1]] == "C")
+              all_individuals <- pop_init |>
                 data.table::melt(measure.vars = patterns("X[0-9]+"), value.name = "variable_value", number = as.numerical) |>
                 # Because they are the only variables used for now
                 dplyr::filter(variable %in% c("X1", "X2")) |>
-                dplyr::mutate(trial = ifelse(trial == "AC", "AC (IPD)", trial))
+                data.table::melt(measure.vars = c("A", "B", "C"), value.name = "Y_obs", variable.name = "ttt", number = as.numerical) |>
+                dplyr::mutate(trial = factor(trial, levels = c("AC", "BC"), labels = c("AC (IPD)", "BC (AgD)")))
 
               marginal_effect <- all_individuals |>
                 dplyr::select(trial, ttt, Y_obs) |>
@@ -102,10 +92,6 @@ server <- function(input, output) {
                 dplyr::summarize(Y_obs = mean(Y_obs)) |>
                 tidyr::pivot_wider(names_from = "ttt", values_from = "Y_obs") |>
                 dplyr::mutate(AB = A - B)
-              browser()
-              true_propensity <- all_individuals |>
-                dplyr::select(trial, prob_w_trial_AC) |>
-                dplyr::group_by()
 
               plot_covariates_distribution <- all_individuals |>
                 ggplot() +
@@ -114,6 +100,11 @@ server <- function(input, output) {
                 labs(x = NULL, y = NULL, title = "Covariates distributions") +
                 theme(strip.text = element_text(size = 12))
 
+              plot_propensity_distribution <- all_individuals |>
+                ggplot() +
+                geom_density(aes(prob_imbalanced_trial, fill = trial), alpha = 0.3) +
+                geom_density(aes(prob_imbalanced_trial), color = "black") + # Both trials together
+                labs(x = NULL, y = NULL, title = "Propensity distributions")
 
               if (list_simulation_parameters$outcome_distribution == "normal") {
                 plot_outcome_distribution <- all_individuals |>
@@ -144,6 +135,7 @@ server <- function(input, output) {
                   labs(x = NULL, y = NULL, title = "Outcome distribution")
               }
               output$plot_covariates_distribution <- renderPlot(plot_covariates_distribution)
+              output$plot_propensity_distribution <- renderPlot(plot_propensity_distribution)
               output$plot_outcome_distribution <- renderPlot(plot_outcome_distribution)
               output$marginal_effect_table <- renderTable(marginal_effect)
 

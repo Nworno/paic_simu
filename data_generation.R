@@ -81,15 +81,6 @@ creating_population <- function(list_simulation_parameters) {
   attach(list_simulation_parameters)
   print(list_simulation_parameters)
 
-
-  if (imbalanced_trial == "AC") {
-    BC_trial_model = balanced_trial_model  # Modèle d'attribution de l'essai BC
-    AC_trial_model = imbalanced_trial_model
-  } else {
-    BC_trial_model = imbalanced_trial_model
-    AC_trial_model = balanced_trial_model
-  }
-
   binary_marker <- rbinom(N_pop, 1, 0.5)
   pop_init <- data.table(
     id = 1:N_pop,
@@ -109,10 +100,6 @@ creating_population <- function(list_simulation_parameters) {
   predict_outcome <- function(outcome_model, df) {
     with(df, eval(outcome_model))
   }
-
-  pop_init[, prob_w_trial_AC := trial_assignement_prob(AC_trial_model, df = pop_init)]
-  pop_init[, prob_w_trial_BC := trial_assignement_prob(BC_trial_model, df = pop_init)]
-  covariate_names <- c("X1", "X2", "X3", "X4")
 
   # 1. Outcome has to be calculated for the BC trial (ie target trial) --> explains the pervasive problems in the imbalanced trial BC, where the estimators target the BC trial, but theoretical is calculated in the overall population (ie the AC trial)
   # 2. Looking that the estimate in the AC imbalanced trial estimations, it seems that the outcome is not calculated conditionnaly to the different parameters
@@ -144,6 +131,8 @@ creating_population <- function(list_simulation_parameters) {
   #      mean(pop_BC$X1) + bY_A_X2 * mean(pop_BC$X2) + bY_A_X3 * mean(pop_BC$X3) + bY_A_X4 * mean(pop_BC$X4)) * 0 + bY_B * 0 + bY_C * 1
   #
 
+  # browser()
+  covariate_names <- c("X1", "X2", "X3", "X4")
 
   df_outcomes_pop_init <- sapply(list(A = pop_init[, .(A = 1L, B = 0L, C = 0L, (.SD)), .SDcols = covariate_names],
                                       B = pop_init[, .(A = 0L, B = 1L, C = 0L, (.SD)), .SDcols = covariate_names],
@@ -167,17 +156,20 @@ creating_population <- function(list_simulation_parameters) {
   } else {
     stop("Unknown outcome distribution")
   }
-  pop_init <- df_outcomes_pop_init[pop_init, on = "id"]
-  # Required because the previous join doesn't preserve the key, and any sampling supposedly based on
-  # an integer key will be actually based on row number!
-  data.table::setkey(pop_init, id)
 
+  pop_init <- df_outcomes_pop_init[, Y_theo:= NULL][pop_init, on = "id"] |> data.table::dcast(formula = ... ~ ttt, value.var = "Y_obs")
 
-  stopifnot(!is.null(data.table::key(pop_init)))
-  pop_BC <- pop_init[sample(id, N_pop, replace = TRUE, prob = prob_w_trial_BC)] # one patient could be represented multiple times, but with such large sample sizes the correlation should not matter at all
-  pop_AC <- pop_init[sample(id, N_pop, replace = TRUE, prob = prob_w_trial_BC)] # one patient could be represented multiple times, but with such large sample sizes the correlation should not matter at all
-  all_individuals <- data.table::rbindlist(list("BC" = pop_BC, "AC" = pop_AC), use.names = TRUE, idcol = 'trial')
+  stopifnot(imbalanced_trial %in% c("AC", "BC"))
+  if (imbalanced_trial == "AC") balanced_trial = "BC" else balanced_trial = "AC"
+  pop_init[, prob_imbalanced_trial := trial_assignement_prob(imbalanced_trial_model, df = pop_init)]
+  pop_init[, trial := rbinom(.N, 1, prob_imbalanced_trial) |>
+             factor(levels = c(0, 1), labels = c(balanced_trial, imbalanced_trial))]
+
+  pop_BC <- pop_init[trial == "BC"][sample(1:.N, N_pop, replace = TRUE), ][, ttt := rep_len(c("C", "B"), length.out = .N)] # one patient could be represented multiple times, but with such large sample sizes the correlation should not matter at all
+  pop_AC <- pop_init[trial == "AC"][sample(1:.N, N_pop, replace = TRUE)][, ttt := rep_len(c("C", "A"), length.out = .N)] # one patient could be represented multiple times, but with such large sample sizes the correlation should not matter at all
+  all_individuals <- data.table::rbindlist(list(pop_BC, pop_AC), use.names = TRUE)
   average_all_individuals <- all_individuals[, lapply(.SD, mean), .SDcols = covariate_names, by = trial]
+
 
   average_conditional_outcome_all_individuals <- sapply(list("A" = average_all_individuals[, .(A = 1L, B = 0L, C = 0L, (.SD)), .SDcols = covariate_names],
                                                              "B" = average_all_individuals[, .(A = 0L, B = 1L, C = 0L, (.SD)), .SDcols = covariate_names],
@@ -188,7 +180,8 @@ creating_population <- function(list_simulation_parameters) {
     c("trial" = list(average_all_individuals$trial)) |>
     as.data.table() |>
     melt(measure.vars = c("A", "B", "C"), variable.name = "ttt", value.name = "outcome")
-  marginal_outcome_all_individuals <- all_individuals[, .(outcome = mean(Y_obs)), by = c("trial", "ttt")]
+  marginal_outcome_all_individuals <- all_individuals[, lapply(.SD, mean), .SDcols = c("A", "B", "C"), by = c("trial")] |>
+    data.table::melt(id.vars = "trial", measure.vars = c("A", "B", "C"), value.name = "outcome", variable.name = "ttt")
   average_outcome_df <- rbindlist(
     list("conditional" = average_conditional_outcome_all_individuals,
          "marginal" = marginal_outcome_all_individuals),
@@ -207,7 +200,6 @@ creating_population <- function(list_simulation_parameters) {
   # mean((diff_AB - mean(diff_AB))^2)
   #
   # average_outcome_df <- merge(average_outcome_df, population_variance, by = "ttt")
-  # browser()
 
   # Correcting theoretical marginal effect, so that it is set to 0 when there is actually
   # no difference between theoretical conditional and marginal, as it should be
@@ -234,14 +226,10 @@ indirect_comparisons <- function(pop_init,
   ############## Drawing trials
   #############################
 
-  trial_AC <- data.table::rbindlist(list(
-    pop_init[ttt == "A"][sample(id, N_RCT, replace = TRUE, prob = prob_w_trial_AC)],
-    pop_init[ttt == "C"][sample(id, N_RCT, replace = TRUE, prob = prob_w_trial_AC)]
-  ))[, ttt := factor(ttt, levels = c("C", "A"))]
-  trial_BC <- data.table::rbindlist(list(
-    pop_init[ttt == "B"][sample(id, N_RCT, replace = TRUE, prob = prob_w_trial_BC)],
-    pop_init[ttt == "C"][sample(id, N_RCT, replace = TRUE, prob = prob_w_trial_BC)]
-  ))[, ttt := factor(ttt, levels = c("C", "B"))]
+  trial_AC <- pop_init[trial == "AC"][sample(1:.N, N_pop, replace = TRUE), ][
+    , ttt := rep_len(c("C", "A"), length.out = .N) |> factor(levels = c("C", "A"))]
+  trial_BC <- pop_init[trial == "BC"][sample(1:.N, N_pop, replace = TRUE), ][
+    , ttt := rep_len(c("C", "B"), length.out = .N) |> factor(levels = c("C", "B"))]
 
   stopifnot(all(levels(trial_AC$ttt)[[1]] == "C",
                 levels(trial_BC$ttt)[[1]] == "C"))
