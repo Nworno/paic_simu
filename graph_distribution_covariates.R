@@ -39,8 +39,8 @@ for (num_population in df_population_parameters$population_parameters_num) {
 
   plot_propensity_distribution <- all_individuals |>
     ggplot() +
-    geom_density(aes(prob_imbalanced_trial, fill = trial), alpha = 0.3) +
-    geom_density(aes(prob_imbalanced_trial), color = "black") + # Both trials together
+    geom_density(aes(prob_BC, fill = trial), alpha = 0.3) +
+    geom_density(aes(prob_BC), color = "black") + # Both trials together
     labs(x = NULL, y = NULL, title = "Propensity distributions")
   saveRDS(plot_propensity_distribution, file.path(path_results_experiments, "propensity_distribution.RDS"))
   ggsave(file.path(path_results_experiments, "propensity_distribution.png"),

@@ -9,7 +9,7 @@
 # (Anchored) naive observed effect in pop_init
 unadjusted_estimator <- function(trial_AC,
                                  trial_BC,
-                                 anchored, 
+                                 anchored,
                                  glm_family) {
   if (anchored) { # ie two steps
     naive_conditional_model_AC <- glm(Y_obs ~ ttt, family = glm_family, data = trial_AC)
@@ -29,7 +29,7 @@ run_unadjusted_estimator <- function(trial_AC, trial_BC, anchored, glm_family) {
   estimate <- unadjusted_estimator(trial_AC, trial_BC, anchored, glm_family)
   boot_estimates <- lapply(1:N_BOOT_ITER, \(x) unadjusted_estimator(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
                                                                     trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
-                                                                    anchored, 
+                                                                    anchored,
                                                                     glm_family))
   variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var(na.rm = TRUE)
   return(list("estimate" = estimate, "variance" = variance))
@@ -40,17 +40,17 @@ run_unadjusted_estimator <- function(trial_AC, trial_BC, anchored, glm_family) {
 ########## PROPENSITY SCORE
 ###########################
 
-#### Estimating wegihts with maximum likelihood logistic regression (propensity score) 
+#### Estimating wegihts with maximum likelihood logistic regression (propensity score)
 max_likelihood <- function(df, model, dependent_variable) {
   PS_BC_trial <- glm(model, df, family = binomial(link = "logit"))$fitted.values
   ATC_w <- (df[[dependent_variable]] %in% "BC") + (df[[dependent_variable]] == "AC") * PS_BC_trial / (1 - PS_BC_trial)
   return(ATC_w)
 }
 
-### Estimating weights with method of moments 
+### Estimating weights with method of moments
 # Defining method of moments functions
 mm_obj_fun <- function(params, X) {
-  sum(exp(X %*% params))  
+  sum(exp(X %*% params))
 }
 mm_grad_fun <- function(params, X) {
   colSums(sweep(X, 1, exp(X %*% params), FUN = "*"))
@@ -58,16 +58,17 @@ mm_grad_fun <- function(params, X) {
 mm <- function(df, mean_covariates) {
   centered_IPD <- sweep(df, 2, mean_covariates, "-")
   random_init <- rep(0, ncol(centered_IPD))
-  
+
   params <- optim(random_init, fn = mm_obj_fun, gr = mm_grad_fun, method = "BFGS", X = centered_IPD)$par
-  weights <- exp(centered_IPD %*% params) 
+  weights <- exp(centered_IPD %*% params)
   return(weights)
 }
 
 propensity_score <- function(trial_AC,
-                             trial_BC, 
-                             covariate_names, 
-                             anchored, 
+                             trial_BC,
+                             covariate_names,
+                             assignment_model,
+                             anchored,
                              weight_estimation_method = c("max_likelihood", "moments"),
                              outcome_family,
                              studying_populations = FALSE) {
@@ -80,8 +81,8 @@ propensity_score <- function(trial_AC,
       #### Propensity score weights
       df[, trial := relevel(as.factor(trial), ref = "AC")]
       stopifnot(levels(df$trial)[[1]] == "AC")
-      trial_assigment_model <- paste0("trial ~ ", paste0(covariate_names, collapse = " + "))
-      PS_BC_trial <- glm(trial_assigment_model, df, family = binomial(link = "logit"))$fitted.values
+      trial_assignment_model <- paste0("trial ~ ", assignment_model)
+      PS_BC_trial <- glm(trial_assignment_model, df, family = binomial(link = "logit"))$fitted.values
       trial_weights <- (df[["trial"]] == "BC") + (df[["trial"]] == "AC") * PS_BC_trial / (1 - PS_BC_trial)
     } else if (weight_estimation_method == "moments") {
       ##### MAIC weights
@@ -110,13 +111,13 @@ propensity_score <- function(trial_AC,
       #### Propensity score weights
       df[, ttt := relevel(as.factor(ttt), ref = "A")]
       stopifnot(levels(df$ttt)[[1]] == "A")
-      ttt_assigment_model <- paste0("ttt ~ ", paste0(covariate_names, collapse = " + "))
-      PS_B_ttt <- glm(ttt_assigment_model, df, family = binomial(link = "logit"))$fitted.values
+      ttt_assignment_model <- paste0("ttt ~ ", assignment_model)
+      PS_B_ttt <- glm(ttt_assignment_model, df, family = binomial(link = "logit"))$fitted.values
       trial_weights <- (PS_B_ttt / (1 - PS_B_ttt)) * (df[["ttt"]] == "A") + (df[["ttt"]] == "B")
     } else if (weight_estimation_method == "moments") {
       ##### MAIC weights
-      trial_weights <- mm(data.matrix(trial_A[, covariate_names, with = FALSE]), 
-                      colMeans(trial_B[, covariate_names, with = FALSE])) |> 
+      trial_weights <- mm(data.matrix(trial_A[, covariate_names, with = FALSE]),
+                      colMeans(trial_B[, covariate_names, with = FALSE])) |>
         c(rep(1, nrow(trial_B)))
     } else {
       stop("No weighting method provided")
@@ -125,7 +126,7 @@ propensity_score <- function(trial_AC,
       print("oh yeah")
       return(trial_weights)
     }
-    
+
     df[, ttt := relevel(as.factor(ttt), ref = "B")]
     stopifnot(levels(df$ttt)[[1]] == "B")
     if (outcome_family$family == "binomial") {
@@ -138,25 +139,27 @@ propensity_score <- function(trial_AC,
   # ALl estimated in one step, but similar as doing it in two steps when not adjusted on any confoundings. The "anchored" comparison is performed by the " + trial" in the model
   fitted_glm <- glm(outcome_model,
                     family = outcome_family,
-                    data = df, 
+                    data = df,
                     weights = trial_weights)
   estimate_AB <- fitted_glm$coefficients[["tttA"]]
   return(estimate_AB)
 }
 
-run_propensity_score <- function(trial_AC, trial_BC, covariate_names, anchored, weight_estimation_method, outcome_family, studying_populations = FALSE) {
+run_propensity_score <- function(trial_AC, trial_BC, covariate_names, assignment_model, anchored, weight_estimation_method, outcome_family, studying_populations = FALSE) {
   estimate <- propensity_score(trial_AC,
-                               trial_BC, 
-                               covariate_names, 
-                               anchored, 
-                               weight_estimation_method, 
+                               trial_BC,
+                               covariate_names,
+                               assignment_model,
+                               anchored,
+                               weight_estimation_method,
                                outcome_family,
                                studying_populations)
   boot_estimates <- lapply(1:N_BOOT_ITER, \(x) propensity_score(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = c("ttt")],
                                                                 trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = c("ttt")],
-                                                                covariate_names, 
-                                                                anchored, 
-                                                                weight_estimation_method, 
+                                                                covariate_names,
+                                                                assignment_model,
+                                                                anchored,
+                                                                weight_estimation_method,
                                                                 outcome_family,
                                                                 studying_populations))
   variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var()
@@ -167,17 +170,17 @@ run_propensity_score <- function(trial_AC, trial_BC, covariate_names, anchored, 
 ########## REGRESSION MODELS
 ############################
 regression_model <- function(trial_AC,
-                             trial_BC, 
-                             predictors_model, 
+                             trial_BC,
+                             predictors_model,
                              covariate_names,
-                             anchored, 
+                             anchored,
                              full_ipd,
                              outcome_family) {
   # if (all(c("X1", "X2") %in% covariate_names) & bY_A_X1 == 1 & bY_A_X2 == 1 & ) browser()
-    
+
     if (full_ipd) {
       # Classic IPD -->
-      ### Classic regression model 
+      ### Classic regression model
       df_full_ipd <- data.table::rbindlist(list("AC" = trial_AC, "BC" = trial_BC),
                                            idcol = "trial",
                                            fill = TRUE)
@@ -192,14 +195,14 @@ regression_model <- function(trial_AC,
       df_full_ipd[, ttt := relevel(as.factor(ttt), ref = "B")]
       stopifnot(levels(df_full_ipd$ttt)[[1]] == "B")
       mean_covariates_BC <- colMeans(trial_BC[, ..covariate_names])
-      df_full_ipd_centered <- sweep(df_full_ipd[, ..covariate_names], 2, mean_covariates_BC, "-") |> 
+      df_full_ipd_centered <- sweep(df_full_ipd[, ..covariate_names], 2, mean_covariates_BC, "-") |>
         cbind(df_full_ipd[, .(Y_obs, ttt, trial)])
       fitted_model <- glm(outcome_regression_model,
                           data = df_full_ipd_centered,
                           family = outcome_family)
-      estimate_AB <- fitted_model$coefficients[["tttA"]] 
+      estimate_AB <- fitted_model$coefficients[["tttA"]]
     } else {
-      #### STC 
+      #### STC
       if (anchored) {
         trial_AC_to_center <- copy(trial_AC)
         trial_AC_to_center[, ttt := relevel(factor(ttt), ref = "C")]
@@ -233,11 +236,11 @@ regression_model <- function(trial_AC,
 run_regression_model <- function(trial_AC, trial_BC, outcome_regression_model, covariate_names, full_ipd, anchored, outcome_family) {
   estimate <- regression_model(trial_AC, trial_BC, outcome_regression_model, covariate_names, anchored, full_ipd, outcome_family)
   boot_estimates <- lapply(1:N_BOOT_ITER, \(x) {
-    regression_model(trial_AC[sample(1:.N, size = .N, replace = TRUE), .SD, by = ttt], 
+    regression_model(trial_AC[sample(1:.N, size = .N, replace = TRUE), .SD, by = ttt],
                      trial_BC[sample(1:.N, size = .N, replace = TRUE), .SD, by = ttt],
-                     outcome_regression_model, 
+                     outcome_regression_model,
                      covariate_names,
-                     anchored, 
+                     anchored,
                      full_ipd,
                      outcome_family)
   })
@@ -264,7 +267,7 @@ run_regression_model <- function(trial_AC, trial_BC, outcome_regression_model, c
 #########
 ### MAIC
 #########
-# 
+#
 # maic <- function(trial_AC, trial_BC, covariate_names, anchored, outcome_family, studying_populations = FALSE) {
 #   if (anchored) {
 #     mean_trial_BC <- trial_BC[, lapply(.SD, mean), .SDcols = covariate_names] |> data.matrix()
@@ -297,7 +300,7 @@ run_regression_model <- function(trial_AC, trial_BC, outcome_regression_model, c
 #   }
 #   return(estimate_AB)
 # }
-# 
+#
 # run_maic <- function(trial_AC, trial_BC, covariate_names, anchored, outcome_family) {
 #   stopifnot(levels(trial_AC$ttt)[[1]] == "C")
 #   estimate <- maic(trial_AC, trial_BC, covariate_names, anchored, outcome_family)
@@ -310,7 +313,7 @@ run_regression_model <- function(trial_AC, trial_BC, outcome_regression_model, c
 #   return(list("estimate" = estimate, "variance" = variance))
 # }
 
-# 
+#
 # anchored_conditional_estimation <- function(centered_trial_AC, centered_trial_BC, regression_model, glm_family) {
 #   # two-steps individual patient data network meta analysis --> would be interesting to compare performance differences of this method
 #   # as compared to random effect NMA
@@ -320,12 +323,12 @@ run_regression_model <- function(trial_AC, trial_BC, outcome_regression_model, c
 #   browser()
 #   model_AC <- glm(regression_model, glm_family, data = centered_trial_AC) # adjusted conditional effect
 #   # BC shouldn't be adjusted in most clinical trials, so this is a more favorable situation than what is usually done
-#   # in practice, because usually comparing a conditional effect to a marginal one 
+#   # in practice, because usually comparing a conditional effect to a marginal one
 #   model_BC <- glm(regression_model, glm_family, data = centered_trial_BC) # adjusted conditional effect
 #   estimate_AC <- model_AC$coefficients[["tttA"]]
 #   estimate_BC <- model_BC$coefficients[["tttB"]]
 #   estimate_AB <- estimate_AC - estimate_BC
-#   
+#
 #   ## Equivalent to
 #   # model_AC <- glm(formula(Y_obs ~ X1*ttt), glm_family, trial_AC)
 #   # estimate_AC <- model_AC$coefficients[["tttA"]] + model_AC$coefficients[["X1:tttA"]] * trial_BC[, mean(X1)]
@@ -359,7 +362,7 @@ run_regression_model <- function(trial_AC, trial_BC, outcome_regression_model, c
 #   model_AB <- glm(regression_model, data = both_trials, family = glm_family) # conditional effect
 #   estimate_AB <- model_AB$coefficients[["tttA"]]
 # }
-# 
+#
 
 
 # run_unanchored_conditional_estimation <- function(centered_trial_AC, centered_trial_BC, outcome_regression_model, glm_family) {
@@ -397,7 +400,7 @@ run_regression_model <- function(trial_AC, trial_BC, outcome_regression_model, c
 #     outcome_regression_model <- paste0("Y_obs ~ ", paste0(covariate_names, collapse = " + "))
 #     average_observed_B <- trial_BC[ttt == "B", mean(Y_obs)]
 #     regression_model(trial_AC[ttt == "A", ], outcome_regression_model, outcome_family, "tttA")
-#     
+#
 #     stc_model <- glm(outcome_regression_model,
 #                      family = outcome_family,
 #                      data = centered_trial_AC[ttt == "A",])

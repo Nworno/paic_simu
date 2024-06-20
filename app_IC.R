@@ -78,7 +78,6 @@ server <- function(input, output) {
   date_simulations <- DATE_EXPERIMENT
   print(DATE_EXPERIMENT)
   dir_simulations <- file.path("results_simulations", date_simulations)
-  print(file.exists(file.path(dir_simulations, "1", "propensity_distribution.RDS")))
 
   df_population_parameters <- readRDS(file.path(dir_simulations, "df_population_parameters.RDS"))
   df_estimators_parameters <- readRDS(file.path(dir_simulations, "df_estimators_parameters.RDS"))

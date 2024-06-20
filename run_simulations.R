@@ -1,4 +1,4 @@
-options(mc.cores = 1)
+options(mc.cores = 8)
 
 source("estimators.R")
 source("data_generation.R")
@@ -6,9 +6,9 @@ source("data_generation.R")
 ####################
 # Parameters
 ####################
-N_pop <- 10^6
+N_pop <- 10^7
 N_BOOT_ITER <- 3
-n_iter <- 4
+n_iter <- 400
 
 ###############
 ### SIMULATIONS
@@ -24,14 +24,11 @@ for (row_population in 1:nrow(df_population_parameters)) {
   dir_sub_experiment <- file.path(experiment_results_directory, row_population)
   dir.create(dir_sub_experiment)
   list_simulation_parameters <- df_population_parameters[row_population, ] |> unlist()
-  
-  population <- creating_population(list_simulation_parameters) # pop initiale
+
+  population <- creating_population(list_simulation_parameters) # pop initial
   pop_init <- population$pop_init # données simulées
-  df_outcomes <- population$df_outcomes # outcome théorique par patient
-  average_outcome_df <- population$average_outcome_df # moyenne de ces outcomes (estimation empirique de l'effet marginal et conditionnel)
 
-
-  saveRDS(average_outcome_df, file.path(dir_sub_experiment, "average_outcome_df.RDS"))
+  saveRDS(population$average_outcome_df, file.path(dir_sub_experiment, "average_outcome_df.RDS"))
   # Commented because huge file, so would take could much space if saved for every try
   # saveRDS(pop_init, file.path(dir_sub_experiment, "pop_init.RDS"))
 
@@ -44,7 +41,8 @@ for (row_population in 1:nrow(df_population_parameters)) {
                                                          N_BOOT_ITER,
                                                          list_estimators_parameters[["N_RCT"]],
                                                          list_estimators_parameters[["outcome_regression_model"]],
-                                                         list_estimators_parameters[["covariate_names"]], 
+                                                         list_estimators_parameters[["covariate_names"]],
+                                                         list_estimators_parameters[["assignment_model"]],
                                                          gaussian(link = "identity"))
       time_eluded <- Sys.time() - time_start_iteration
       cat("Experiment ", row_population, ".", row_estimators, ", Iteration ", i, ", length: ", time_eluded, " seconds\n", sep = "")

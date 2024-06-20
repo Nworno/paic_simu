@@ -6,70 +6,45 @@ library(data.table)
 
 df_population_parameters <- list(
   prop_X1 = 0.5, # Variable binaire, prevalence dans la population
-  bT_X1 = c(2),   # Effet de la variable binaire sur la probabilité d'être dans l'essai AC
-  bT_X2 = c(0, 1),   # Effet de la variable continue X2...
+  bT = 3,
+  bT_X1 = c(0.5),   # Effet de la variable binaire sur la probabilité d'être dans l'essai BC
+  bT2_X1 = c(0.5),   # Effet de la variable binaire sur la probabilité d'être dans l'essai BC
+  bT_X2 = c(-0.5),   # Effet de la variable continue X2...
+  bT2_X2 = c(-0.5),   # Effet de la variable continue X2...
+  fbT = c(1),
   bT_X3 = 0,     # Idem, mais inutile pour le moment
   bT_X4 = 0,     # Idem, mais inutile pour le moment
-  bY_X1 = 1.5,   # Effet de X1 sur l'outcome
-  bY_X2 = 1,   # Effet de X2 sur l'outcome
+  bY_X1 = 2,   # Effet de X1 sur l'outcome
+  bY_X2 = 2,   # Effet de X2 sur l'outcome
   bY_X3 = 0,     # Effet de X3 sur l'outcome (inutile pour le moment)
   bY_X4 = 0,     # Effet de X4 sur l'outcome
-  bY_A_X1 = c(0, 1), # Interaction A et X1 dans le modèle outcome
-  bY_A_X2 = c(0, 1), # Interaction A et X2 dans le modèle outcome
+  bY_A_X1 = c(0.5), # Interaction A et X1 dans le modèle outcome
+  bY_A_X2 = c(-0.5), # Interaction A et X2 dans le modèle outcome
   bY_A_X3 = c(0), # Interaction A et X3 dans le modèle outcome
   bY_A_X4 = c(0), # Interaction A et X4 dans le modèle outcome
+  bY_B_X1 = c(0.3), # Interaction A et X1 dans le modèle outcome
+  bY_B_X2 = c(0), # Interaction A et X2 dans le modèle outcome
+  bY_B_X3 = c(0), # Interaction A et X3 dans le modèle outcome
+  bY_B_X4 = c(0), # Interaction A et X4 dans le modèle outcome
   binary_marker = c(bquote(rbinom(N_pop, 1, 0.5))), # Utilisé pour la variable bimodale
-  f_X1 = c(bquote(rnorm(N_pop, -2, 1))), # distribution de X1 (revoir car il faudrait utiliser prop_X1)
-  f_X1 = c(bquote(rnorm(N_pop, -2, 1))), # distribution de X1 (revoir car il faudrait utiliser prop_X1)
-  f_X2 = c(bquote(binary_marker * rnorm(N_pop, -2, 1) + (1 - binary_marker) * rnorm(N_pop, 2, 1))), # distribution de X2
+  # f_X1 = c(bquote(rnorm(N_pop, 0, 1))), # distribution de X1 (revoir car il faudrait utiliser prop_X1)
+  f_X1 = c(bquote(binary_marker * rnorm(N_pop, 0, 1) + (1 - binary_marker) * rnorm(N_pop, 3, 1.5))), # distribution de X1 (revoir car il faudrait utiliser prop_X1)
+  f_X2 = c(bquote(binary_marker * rnorm(N_pop, 0, 1) + (1 - binary_marker) * rnorm(N_pop, 3, 1.5))), # distribution de X2
   f_X3 = c(bquote(0)), # inutile pour le moment
-  # f_X4 = c(bquote(binary_marker * rnorm(N_pop, -1.5, 1) + (1 - binary_marker) * rnorm(N_pop, 1.5, 1))),
   f_X4 = c(bquote(0)), # inutile pour le moment
-  bY_A = 1.5,  # Effet de A par rapport à C
-  bY_B = 1.5,  # Effet de B par rapport à C
+  bY_A = 1,  # Effet de A par rapport à C
+  bY_B = 0.3,  # Effet de B par rapport à C
   bY_C = 0,    # Pas d'effet de C sur l'outcome
-  imbalanced_trial = c("AC", "BC"),
-  # imbalanced_trial = c("AC"),
-  imbalanced_trial_model = c(bquote(X1 * bT_X1 + X2 * bT_X2 + X3 * bT_X3 + X4 * bT_X4)), # Modèle d'attribution de l'essai AC
-  balanced_trial_model = c(bquote(0)),  # Modèle d'attribution de l'essai BC
+  # BC_trial_model = c(bquote(X1 * bT_X1 + X2 * bT_X2 + X3 * bT_X3 + X4 * bT_X4)), # Modèle d'attribution de l'essai BC
+  BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2)), # Modèle d'attribution de l'essai BC
   outcome_distribution = "normal",
   outcome_generation_formula =  c(bquote(
-    bY_X1*X1 + bY_X2 * X2 + bY_X3 * X3 + bY_X4 * X4 + (bY_A + bY_A_X1*X1 + bY_A_X2*X2 + bY_A_X3*X3 + bY_A_X4*X4) * A +  bY_B*B + bY_C*C
+    bY_X1*X1 + bY_X2 * X2 + bY_X3 * X3 + bY_X4 * X4 + (bY_A + bY_A_X1*X1 + bY_A_X2*X2 + bY_A_X3*X3 + bY_A_X4*X4) * A +  (bY_B + bY_B_X1*X1 + bY_B_X2*X2 + bY_B_X3*X3 + bY_B_X4*X4) *B + bY_C*C
   ))
 )  |>
   expand.grid(stringsAsFactors = FALSE) |>
   as.data.table()
 df_population_parameters[, population_parameters_num := 1:.N]
-# df_population_parameters <- df_population_parameters[population_parameters_num == 6,]
-
-df_population_parameters <- list(
-  # prop_X1 = 0.5, # Variable binaire, prevalence dans la population
-  bT_X1 = c(1),   # Effet de la variable sur la probabilité d'être dans l'essai BC
-  bT_X2 = c(1),   # Effet de la variable continue X2...
-  bY_X1 = c(0),   # Effet de X1 sur l'outcome
-  bY_X2 = c(0),   # Effet de X2 sur l'outcome
-  bY_A_X1 = c(1), # Interaction A et X1 dans le modèle outcome
-  bY_A_X2 = c(1), # Interaction A et X2 dans le modèle outcome
-  # binary_marker = c(bquote(rbinom(N_pop, 1, 0.5))), # Utilisé pour la variable bimodale
-  f_X1 = c(bquote(rnorm(N_pop, 1, 1))),
-  f_X2 = c(bquote(rnorm(N_pop, 1, 1))), # distribution de X2
-  bY_A = 1.5,  # Effet de A par rapport à C
-  bY_B = 1.5,  # Effet de B par rapport à C
-  bY_C = 0,    # Pas d'effet de C sur l'outcome
-  imbalanced_trial = c("BC"),
-  # imbalanced_trial = c("AC"),
-  imbalanced_trial_model = c(bquote(X1 * bT_X1 + X2 * bT_X2 )), # Modèle d'attribution de l'essai AC
-  balanced_trial_model = c(bquote(0)),  # Modèle d'attribution de l'essai BC
-  outcome_distribution = "normal",
-  outcome_generation_formula =  c(bquote(
-    bY_X1*X1 + bY_X2 * X2 +  (bY_A + bY_A_X1*X1 + bY_A_X2*X2) * A +  bY_B*B + bY_C*C
-  ))
-)  |>
-  expand.grid(stringsAsFactors = FALSE) |>
-  as.data.table()
-df_population_parameters[, population_parameters_num := 1:.N]
-# df_population_parameters <- df_population_parameters[population_parameters_num == 6,]
-
 
 
 ##############################################
@@ -80,6 +55,13 @@ df_population_parameters[, population_parameters_num := 1:.N]
 creating_population <- function(list_simulation_parameters) {
   attach(list_simulation_parameters)
   print(list_simulation_parameters)
+
+  # Modifying the coefficient values using fbT
+  bT <- bT*fbT
+  bT_X1 <- bT_X1*fbT
+  bT2_X1 <- bT2_X1*fbT
+  bT_X2 <- bT_X2*fbT
+  bT2_X2 <- bT2_X2*fbT
 
   binary_marker <- rbinom(N_pop, 1, 0.5)
   pop_init <- data.table(
@@ -101,37 +83,6 @@ creating_population <- function(list_simulation_parameters) {
     with(df, eval(outcome_model))
   }
 
-  # 1. Outcome has to be calculated for the BC trial (ie target trial) --> explains the pervasive problems in the imbalanced trial BC, where the estimators target the BC trial, but theoretical is calculated in the overall population (ie the AC trial)
-  # 2. Looking that the estimate in the AC imbalanced trial estimations, it seems that the outcome is not calculated conditionnaly to the different parameters
-    # Let's take for instance the scenario with bYA_X1 = 1, bYAX2 = 1, bTX2 = 1
-  # if (population_parameters_num == 6) browser()
-  # pop_AC <- pop_init[sample(id, 10**6, replace = TRUE, prob = prob_w_trial_AC)]
-  #
-  # ## AC
-  # YA = bY_X1 * mean(pop_AC$X1) + bY_X2 * mean(pop_AC$X2) + 0 * mean(pop_AC$X3) + 0 * mean(pop_AC$X4) +
-  #   (bY_A +  bY_A_X1 *
-  #      mean(pop_AC$X1) + bY_A_X2 * mean(pop_AC$X2) + bY_A_X3 * mean(pop_AC$X3) + bY_A_X4 * mean(pop_AC$X4)) * 1 + bY_B * 0 + bY_C * 0
-  # YB = bY_X1 * mean(pop_AC$X1) + bY_X2 * mean(pop_AC$X2) + 0 * mean(pop_AC$X3) + 0 * mean(pop_AC$X4) +
-  #   (bY_A +  bY_A_X1 *
-  #      mean(pop_AC$X1) + bY_A_X2 * mean(pop_AC$X2) + bY_A_X3 * mean(pop_AC$X3) + bY_A_X4 * mean(pop_AC$X4)) * 0 + bY_B * 1 + bY_C * 0
-  # YA - YB
-  # YC = bY_X1 * mean(pop_AC$X1) + bY_X2 * mean(pop_AC$X2) + 0 * mean(pop_AC$X3) + 0 * mean(pop_AC$X4) +
-  #   (bY_A +  bY_A_X1 *
-  #      mean(pop_AC$X1) + bY_A_X2 * mean(pop_AC$X2) + bY_A_X3 * mean(pop_AC$X3) + bY_A_X4 * mean(pop_AC$X4)) * 0 + bY_B * 0 + bY_C * 1
-  # ## BC
-  # YA = bY_X1 * mean(pop_BC$X1) + bY_X2 * mean(pop_BC$X2) + 0 * mean(pop_BC$X3) + 0 * mean(pop_BC$X4) +
-  #   (bY_A +  bY_A_X1 *
-  #      mean(pop_BC$X1) + bY_A_X2 * mean(pop_BC$X2) + bY_A_X3 * mean(pop_BC$X3) + bY_A_X4 * mean(pop_BC$X4)) * 1 + bY_B * 0 + bY_C * 0
-  # YB = bY_X1 * mean(pop_BC$X1) + bY_X2 * mean(pop_BC$X2) + 0 * mean(pop_BC$X3) + 0 * mean(pop_BC$X4) +
-  #   (bY_A +  bY_A_X1 *
-  #      mean(pop_BC$X1) + bY_A_X2 * mean(pop_BC$X2) + bY_A_X3 * mean(pop_BC$X3) + bY_A_X4 * mean(pop_BC$X4)) * 0 + bY_B * 1 + bY_C * 0
-  # YA - YB
-  # YC = bY_X1 * mean(pop_BC$X1) + bY_X2 * mean(pop_BC$X2) + 0 * mean(pop_BC$X3) + 0 * mean(pop_BC$X4) +
-  #   (bY_A +  bY_A_X1 *
-  #      mean(pop_BC$X1) + bY_A_X2 * mean(pop_BC$X2) + bY_A_X3 * mean(pop_BC$X3) + bY_A_X4 * mean(pop_BC$X4)) * 0 + bY_B * 0 + bY_C * 1
-  #
-
-  # browser()
   covariate_names <- c("X1", "X2", "X3", "X4")
 
   df_outcomes_pop_init <- sapply(list(A = pop_init[, .(A = 1L, B = 0L, C = 0L, (.SD)), .SDcols = covariate_names],
@@ -159,14 +110,12 @@ creating_population <- function(list_simulation_parameters) {
 
   pop_init <- df_outcomes_pop_init[, Y_theo:= NULL][pop_init, on = "id"] |> data.table::dcast(formula = ... ~ ttt, value.var = "Y_obs")
 
-  stopifnot(imbalanced_trial %in% c("AC", "BC"))
-  if (imbalanced_trial == "AC") balanced_trial = "BC" else balanced_trial = "AC"
-  pop_init[, prob_imbalanced_trial := trial_assignement_prob(imbalanced_trial_model, df = pop_init)]
-  pop_init[, trial := rbinom(.N, 1, prob_imbalanced_trial) |>
-             factor(levels = c(0, 1), labels = c(balanced_trial, imbalanced_trial))]
+  pop_init[, prob_BC := trial_assignement_prob(BC_trial_model, df = pop_init)]
+  pop_init[, trial := rbinom(.N, 1, prob_BC) |>
+             factor(levels = c(0, 1), labels = c("AC", "BC"))]
 
   pop_BC <- pop_init[trial == "BC"][sample(1:.N, N_pop, replace = TRUE), ][, ttt := rep_len(c("C", "B"), length.out = .N)] # one patient could be represented multiple times, but with such large sample sizes the correlation should not matter at all
-  pop_AC <- pop_init[trial == "AC"][sample(1:.N, N_pop, replace = TRUE)][, ttt := rep_len(c("C", "A"), length.out = .N)] # one patient could be represented multiple times, but with such large sample sizes the correlation should not matter at all
+  pop_AC <- pop_init[trial == "AC"][sample(1:.N, N_pop, replace = TRUE)][, ttt := rep_len(c("C", "A"), length.out = .N)]
   all_individuals <- data.table::rbindlist(list(pop_BC, pop_AC), use.names = TRUE)
   average_all_individuals <- all_individuals[, lapply(.SD, mean), .SDcols = covariate_names, by = trial]
 
@@ -220,17 +169,20 @@ indirect_comparisons <- function(pop_init,
                                  N_RCT,
                                  outcome_regression_model,
                                  covariate_names,
+                                 assignment_model,
                                  glm_family = gaussian(link = "identity")) {
 
   #############################
   ############## Drawing trials
   #############################
 
-  trial_AC <- pop_init[trial == "AC"][sample(1:.N, N_pop, replace = TRUE), ][
+  trial_AC <- pop_init[trial == "AC"][sample(1:.N, N_RCT, replace = TRUE), ][
     , ttt := rep_len(c("C", "A"), length.out = .N) |> factor(levels = c("C", "A"))]
-  trial_BC <- pop_init[trial == "BC"][sample(1:.N, N_pop, replace = TRUE), ][
+  trial_BC <- pop_init[trial == "BC"][sample(1:.N, N_RCT, replace = TRUE), ][
     , ttt := rep_len(c("C", "B"), length.out = .N) |> factor(levels = c("C", "B"))]
 
+  trial_AC$Y_obs <- with(trial_AC, dplyr::case_match(as.character(ttt), "A" ~ A, "B" ~ B, "C" ~ C))
+  trial_BC$Y_obs <- with(trial_BC, dplyr::case_match(as.character(ttt), "A" ~ A, "B" ~ B, "C" ~ C))
   stopifnot(all(levels(trial_AC$ttt)[[1]] == "C",
                 levels(trial_BC$ttt)[[1]] == "C"))
 
@@ -266,6 +218,7 @@ indirect_comparisons <- function(pop_init,
   struct_results$iptw$anchored$ml <- run_propensity_score(trial_AC,
                                                           trial_BC,
                                                           covariate_names,
+                                                          assignment_model,
                                                           anchored = TRUE,
                                                           weight_estimation_method = "max_likelihood",
                                                           studying_populations = FALSE,
@@ -273,6 +226,7 @@ indirect_comparisons <- function(pop_init,
   struct_results$iptw$unanchored$ml <- run_propensity_score(trial_AC,
                                                             trial_BC,
                                                             covariate_names,
+                                                            assignment_model,
                                                             anchored = FALSE,
                                                             weight_estimation_method = "max_likelihood",
                                                             studying_populations = FALSE,
@@ -284,6 +238,7 @@ indirect_comparisons <- function(pop_init,
   struct_results$iptw$anchored$maic <- run_propensity_score(trial_AC,
                                                             trial_BC,
                                                             covariate_names,
+                                                            assignment_model,
                                                             anchored = TRUE,
                                                             weight_estimation_method = "moments",
                                                             outcome_family = glm_family,
@@ -292,6 +247,7 @@ indirect_comparisons <- function(pop_init,
                                                               trial_BC,
                                                               covariate_names,
                                                               anchored = FALSE,
+                                                              assignment_model,
                                                               weight_estimation_method = "moments",
                                                               outcome_family = glm_family,
                                                               studying_populations = FALSE)
@@ -355,12 +311,15 @@ list_covariate_names <- c(
   combn(c("X1", "X2"), m = 2, simplify = FALSE)
 ) |> as.vector()
 
-# Manual specification of outcome regression models, automatic for now
-# list_outcome_regression_models <- c(
-#   "X1*ttt",
-#   "X2*ttt",
-#   "X1*ttt + X2*ttt"
-# )
+quadratic = TRUE
+if (quadratic == TRUE) {
+  list_assignment_model <- sapply(
+    list_covariate_names,
+    \(li) sapply(li, \(x) paste0("poly(", x, ", 2, raw = TRUE)")) |> paste0(collapse = " + ")
+  )
+} else {
+  list_assignment_model <- sapply(list_covariate_names, paste0, collapse = " + ")
+}
 list_outcome_regression_models <- sapply(
   list_covariate_names,
   \(li) sapply(li, \(x) paste0(x, "*ttt")) |> paste0(collapse = " + ")
@@ -368,8 +327,9 @@ list_outcome_regression_models <- sapply(
 
 df_estimators_parameters <- data.table(
   "covariate_names" = list_covariate_names,
+  "assignment_model" = list_assignment_model,
   "outcome_regression_model" = list_outcome_regression_models,
-  N_RCT = 500
+  N_RCT = 100
 )
 df_estimators_parameters[, estimator_num := 1:.N]
 

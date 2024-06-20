@@ -21,10 +21,18 @@ long_df_results <- lapply(nested_list_results_df, \(l) {
   rbindlist(idcol = "population_parameters_num")
 long_df_results[, estimator_num := gsub(pattern = ".*(?<=experiment_)(\\d+)(?=\\.RDS).*", replacement = "\\1", x = estimator_num, perl = TRUE)]
 
+
 df_true_effects <- list.dirs(dir_experience_results) |>
   lapply(list.files, pattern = "average_outcome_df", full.names = TRUE) |>
   Filter(f = \(x) length(x) != 0) |>
-  lapply(readRDS) |>
+  lapply(\(x) {
+    name <- stringr::str_extract(pattern = "\\d+(?=\\/average_outcome_df\\.RDS)", x)
+    value <- readRDS(x)
+    alist <- list(value)
+    names(alist) <- name
+    return(alist)
+    }) |>
+  unlist(recursive = FALSE) |>
   rbindlist(idcol = "population_parameters_num")
 
 df_population_parameters <- readRDS(file = file.path(dir_experience_results, "df_population_parameters.RDS")) |>
@@ -36,12 +44,10 @@ combined_parameters <- merge(df_population_parameters[, .((.SD), key = 1)],
                              all.x = TRUE,
                              allow.cartesian = TRUE)
 
-df_true_effects_merged <- df_true_effects |>
-  merge(combined_parameters[, .((.SD), key = 1)],
+df_true_effects_merged <- df_true_effects[, population_parameters_num := as.integer(population_parameters_num)] |>
+  merge(combined_parameters,
         all.x = TRUE,
         allow.cartesian = TRUE)
-
-# View(df_true_effects_merged[, .SD, .SDcols = c("bY_A_X1", "bY_A_X2", names(df_true_effects))])
 
 ########################
 # Aligning DGM and estimators models:
@@ -164,7 +170,7 @@ long_df_results <- long_df_results |>
          adjustment = ifelse(adjustment == "iptw", "IPTW", stringr::str_to_title(adjustment)),
          model = ifelse(model == "unadjusted", "Unadjusted", toupper(model)))
 
-joined_results <- df_true_effects[, .(population_parameters_num, outcome_type, true_effect = AB)][long_df_results, , on = c("population_parameters_num", "outcome_type")] |>
+joined_results <- df_true_effects[trial == "BC", .(population_parameters_num, outcome_type, true_effect = AB)][long_df_results, , on = c("population_parameters_num", "outcome_type")] |>
   mutate(across(c(population_parameters_num, estimator_num), as.integer)) |>
   rename_with(stringr::str_to_title)
 
@@ -209,11 +215,11 @@ df_stats <- joined_results |>
   summarize(bias = get_bias(Estimate, True_effect ),
             rmse = get_RMSE(Estimate, True_effect ),
             vr = get_VR(Estimate, sqrt(Variance)),
-            cov_95 = get_cov_95(Estimate, sqrt(Variance), True_effect ), 
+            cov_95 = get_cov_95(Estimate, sqrt(Variance), True_effect ),
             correct_decision = correct_decision(Estimate, Variance, True_effect),
             .groups = "drop") |>
   pivot_longer(cols = c("bias", "rmse", "vr", "cov_95", "correct_decision"),
-               names_to = "indicator", values_to = "values") 
+               names_to = "indicator", values_to = "values")
 
 dir.create(file.path(dir_experience_results, "processed_results"))
 saveRDS(df_stats, file.path(dir_experience_results, "processed_results", "df_stats.rds"))

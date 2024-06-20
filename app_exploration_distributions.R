@@ -12,7 +12,6 @@ ui <- fluidPage(
       actionButton("runSimulation", "Run Simulation"),
       selectInput("outcome_distribution", "Outcome Distribution", choices = c("normal", "binomial")),
       selectInput("with_replace", "Sampling with replacement", choices = c(TRUE, FALSE)),
-      selectInput("imbalanced_trial", "Imbalanced Trial", choices = c("AC", "BC")),
       numericInput("bY_A", "bY_A", value = 1.5),
       numericInput("bY_B", "bY_B", value = 1.5),
       numericInput("bY_C", "bY_C", value = 0),
@@ -63,10 +62,7 @@ server <- function(input, output) {
                 bY_A = input$bY_A,  # Effet de A par rapport à C
                 bY_B = input$bY_B,  # Effet de B par rapport à C
                 bY_C = input$bY_C,    # Pas d'effet de C sur l'outcome
-                imbalanced_trial = c(input$imbalanced_trial),
-                # imbalanced_trial = c("AC"),
-                imbalanced_trial_model = bquote(X1 * bT_X1 + X2 * bT_X2 ), # Modèle d'attribution de l'essai AC
-                balanced_trial_model = bquote(0),  # Modèle d'attribution de l'essai BC
+                BC_trial_model = bquote(X1 * bT_X1 + X2 * bT_X2 ),
                 outcome_distribution = input$outcome_distribution,
                 outcome_generation_formula =  bquote(
                   bY_X1*X1 + bY_X2 * X2 +  (bY_A + bY_A_X1*X1 + bY_A_X2*X2) * A +  bY_B*B + bY_C*C
@@ -102,9 +98,10 @@ server <- function(input, output) {
 
               plot_propensity_distribution <- all_individuals |>
                 ggplot() +
-                geom_density(aes(prob_imbalanced_trial, fill = trial), alpha = 0.3) +
-                geom_density(aes(prob_imbalanced_trial), color = "black") + # Both trials together
-                labs(x = NULL, y = NULL, title = "Propensity distributions")
+                geom_density(aes(prob_BC, fill = trial), alpha = 0.3) +
+                geom_density(aes(prob_BC), color = "black") + # Both trials together
+                xlim(0, 1) +
+                labs(x = NULL, y = NULL, title = "Propensity (to belong to BC trial) distributions")
 
               if (list_simulation_parameters$outcome_distribution == "normal") {
                 plot_outcome_distribution <- all_individuals |>
