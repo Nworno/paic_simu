@@ -5,39 +5,40 @@ library(data.table)
 ##############################################
 
 df_population_parameters <- list(
+  N_RCT  = c(500),
   prop_X1 = 0.5, # Variable binaire, prevalence dans la population
   bT = 3,
-  bT_X1 = c(0.5),   # Effet de la variable binaire sur la probabilité d'être dans l'essai BC
+  bT_X1 = c(-0.5),   # Effet de la variable binaire sur la probabilité d'être dans l'essai BC
   bT2_X1 = c(0.5),   # Effet de la variable binaire sur la probabilité d'être dans l'essai BC
   bT_X2 = c(-0.5),   # Effet de la variable continue X2...
-  bT2_X2 = c(-0.5),   # Effet de la variable continue X2...
-  fbT = c(1),
-  bT_X3 = 0,     # Idem, mais inutile pour le moment
-  bT_X4 = 0,     # Idem, mais inutile pour le moment
-  bY_X1 = 2,   # Effet de X1 sur l'outcome
-  bY_X2 = 2,   # Effet de X2 sur l'outcome
-  bY_X3 = 0,     # Effet de X3 sur l'outcome (inutile pour le moment)
-  bY_X4 = 0,     # Effet de X4 sur l'outcome
+  bT2_X2 = c(0.5),   # Effet de la variable continue X2...
+  fbT = c(0.5, 2),
+  bT_X3 = 0.5,
+  bT_X4 = -0.5,
+  bT2_X3 = 0.5,
+  bT2_X4 = -0.5,
+  bY_X1 = 1,   # Effet de X1 sur l'outcome
+  bY_X2 = 1,   # Effet de X2 sur l'outcome
+  bY_X3 = 1,     # Effet de X3 sur l'outcome (inutile pour le moment)
+  bY_X4 = 1,     # Effet de X4 sur l'outcome
   bY_A_X1 = c(0.5), # Interaction A et X1 dans le modèle outcome
-  bY_A_X2 = c(-0.5), # Interaction A et X2 dans le modèle outcome
-  bY_A_X3 = c(0), # Interaction A et X3 dans le modèle outcome
-  bY_A_X4 = c(0), # Interaction A et X4 dans le modèle outcome
-  bY_B_X1 = c(0.3), # Interaction A et X1 dans le modèle outcome
+  bY_A_X2 = c(0.5), # Interaction A et X2 dans le modèle outcome
+  bY_A_X3 = c(0.5), # Interaction A et X3 dans le modèle outcome
+  bY_A_X4 = c(0.5), # Interaction A et X4 dans le modèle outcome
+  bY_B_X1 = c(0), # Interaction A et X1 dans le modèle outcome
   bY_B_X2 = c(0), # Interaction A et X2 dans le modèle outcome
   bY_B_X3 = c(0), # Interaction A et X3 dans le modèle outcome
   bY_B_X4 = c(0), # Interaction A et X4 dans le modèle outcome
-  binary_marker = c(bquote(rbinom(N_pop, 1, 0.5))), # Utilisé pour la variable bimodale
-  # f_X1 = c(bquote(rnorm(N_pop, 0, 1))), # distribution de X1 (revoir car il faudrait utiliser prop_X1)
-  f_X1 = c(bquote(binary_marker * rnorm(N_pop, 0, 1) + (1 - binary_marker) * rnorm(N_pop, 3, 1.5))), # distribution de X1 (revoir car il faudrait utiliser prop_X1)
-  f_X2 = c(bquote(binary_marker * rnorm(N_pop, 0, 1) + (1 - binary_marker) * rnorm(N_pop, 3, 1.5))), # distribution de X2
-  f_X3 = c(bquote(0)), # inutile pour le moment
-  f_X4 = c(bquote(0)), # inutile pour le moment
+  # binary_marker = c(bquote(rbinom(N_pop, 1, 0.5))), # Utilisé pour la variable bimodale : introduit corrélation entre les variables, car le marker est le même pour tous les individus
+  f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1.5))))),
+  f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1.5))))),
+  f_X3 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1.5))))),
+  f_X4 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1.5))))),
   bY_A = 1,  # Effet de A par rapport à C
   bY_B = 0.3,  # Effet de B par rapport à C
   bY_C = 0,    # Pas d'effet de C sur l'outcome
-  # BC_trial_model = c(bquote(X1 * bT_X1 + X2 * bT_X2 + X3 * bT_X3 + X4 * bT_X4)), # Modèle d'attribution de l'essai BC
-  BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2)), # Modèle d'attribution de l'essai BC
-  outcome_distribution = "normal",
+  BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2 + bT_X3 * X3 + bT2_X3 * X3^2 + bT_X4 * X4 + bT2_X4 * X4^2)), # Modèle d'attribution de l'essai BC
+  outcome_distribution = c("normal", "binomial"),
   outcome_generation_formula =  c(bquote(
     bY_X1*X1 + bY_X2 * X2 + bY_X3 * X3 + bY_X4 * X4 + (bY_A + bY_A_X1*X1 + bY_A_X2*X2 + bY_A_X3*X3 + bY_A_X4*X4) * A +  (bY_B + bY_B_X1*X1 + bY_B_X2*X2 + bY_B_X3*X3 + bY_B_X4*X4) *B + bY_C*C
   ))
@@ -62,14 +63,17 @@ creating_population <- function(list_simulation_parameters) {
   bT2_X1 <- bT2_X1*fbT
   bT_X2 <- bT_X2*fbT
   bT2_X2 <- bT2_X2*fbT
+  bT_X3 <- bT_X3*fbT
+  bT2_X3 <- bT2_X3*fbT
+  bT_X4 <- bT_X4*fbT
+  bT2_X4 <- bT2_X4*fbT
 
-  binary_marker <- rbinom(N_pop, 1, 0.5)
   pop_init <- data.table(
     id = 1:N_pop,
     X1 = eval(f_X1),
     X2 = eval(f_X2),
-    X3 = rlnorm(N_pop, 0.5, 0.5),
-    X4 = binary_marker * rnorm(N_pop, -1.5, 1) + (1 - binary_marker) * rnorm(N_pop, 1.5, 1) # tentative d'une variable bimodale (mais pas utilisé finalement, coef à zéro)
+    X3 = 0,
+    X4 = 0 # tentative d'une variable bimodale (mais pas utilisé finalement, coef à zéro)
   ) |>
     setkey("id")
 
@@ -170,7 +174,7 @@ indirect_comparisons <- function(pop_init,
                                  outcome_regression_model,
                                  covariate_names,
                                  assignment_model,
-                                 glm_family = gaussian(link = "identity")) {
+                                 outcome_distribution) {
 
   #############################
   ############## Drawing trials
@@ -185,6 +189,10 @@ indirect_comparisons <- function(pop_init,
   trial_BC$Y_obs <- with(trial_BC, dplyr::case_match(as.character(ttt), "A" ~ A, "B" ~ B, "C" ~ C))
   stopifnot(all(levels(trial_AC$ttt)[[1]] == "C",
                 levels(trial_BC$ttt)[[1]] == "C"))
+
+  glm_family <- switch(outcome_distribution,
+                       normal = gaussian(link = "identity"),
+                       binomial = binomial(link = "logit"))
 
   ###############################
   ########## Unadjusted estimator
@@ -307,8 +315,10 @@ struct_results <- list(
 
 # Used to specify variables to use for "trial exposure" models, and unanchored STC
 list_covariate_names <- c(
-  combn(c("X1", "X2"), m = 1, simplify = FALSE),
-  combn(c("X1", "X2"), m = 2, simplify = FALSE)
+  combn(c("X1", "X2", "X3", "X4"), m = 1, simplify = FALSE),
+  combn(c("X1", "X2", "X3", "X4"), m = 2, simplify = FALSE),
+  combn(c("X1", "X2", "X3", "X4"), m = 3, simplify = FALSE),
+  combn(c("X1", "X2", "X3", "X4"), m = 4, simplify = FALSE)
 ) |> as.vector()
 
 quadratic = TRUE
@@ -328,8 +338,7 @@ list_outcome_regression_models <- sapply(
 df_estimators_parameters <- data.table(
   "covariate_names" = list_covariate_names,
   "assignment_model" = list_assignment_model,
-  "outcome_regression_model" = list_outcome_regression_models,
-  N_RCT = 100
+  "outcome_regression_model" = list_outcome_regression_models
 )
 df_estimators_parameters[, estimator_num := 1:.N]
 

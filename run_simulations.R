@@ -6,9 +6,9 @@ source("data_generation.R")
 ####################
 # Parameters
 ####################
-N_pop <- 10^7
-N_BOOT_ITER <- 3
-n_iter <- 400
+N_pop <- 10^6
+N_BOOT_ITER <- 2
+n_iter <- 50
 
 ###############
 ### SIMULATIONS
@@ -39,11 +39,11 @@ for (row_population in 1:nrow(df_population_parameters)) {
       result_indirect_comparison <- indirect_comparisons(pop_init,
                                                          struct_results,
                                                          N_BOOT_ITER,
-                                                         list_estimators_parameters[["N_RCT"]],
+                                                         list_simulation_parameters[["N_RCT"]],
                                                          list_estimators_parameters[["outcome_regression_model"]],
                                                          list_estimators_parameters[["covariate_names"]],
                                                          list_estimators_parameters[["assignment_model"]],
-                                                         gaussian(link = "identity"))
+                                                         list_simulation_parameters[["outcome_distribution"]])
       time_eluded <- Sys.time() - time_start_iteration
       cat("Experiment ", row_population, ".", row_estimators, ", Iteration ", i, ", length: ", time_eluded, " seconds\n", sep = "")
       return(result_indirect_comparison)
@@ -54,4 +54,5 @@ for (row_population in 1:nrow(df_population_parameters)) {
 }
 cat("Simulation length: ")
 print(Sys.time() - time_start)
-
+print(time_start_string)
+write(paste0("DATE_EXPERIMENT <- '", time_start_string, "'"), file = "env_variables.R", append = FALSE)

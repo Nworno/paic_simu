@@ -14,7 +14,7 @@ source("data_generation.R")
 # Drawing covariates distributions
 ##################################
 
-N_pop <- 10^5
+N_pop <- 10^6
 # path_experiment <- file.path("results_simulations", "test")
 # if (!dir.exists(path_experiment)) dir.create(path_experiment)
 path_experiment <- file.path("results_simulations", DATE_EXPERIMENT)

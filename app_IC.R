@@ -40,7 +40,16 @@ ui <- bs4DashPage(
                               title = "Distributions",
                               tabPanel(
                                 title = "Treatment effect",
-                                plotOutput("treatment_effect")
+                                fluidRow(
+                                  column(
+                                    plotOutput("treatment_effect"),
+                                    width = 6
+                                  ),
+                                  column(
+                                    tableOutput("tableTreatmentEffect"),
+                                    width = 6
+                                  )
+                                )
                               ),
                               tabPanel(
                                 title = "Propensity distribution",
@@ -79,6 +88,7 @@ server <- function(input, output) {
   print(DATE_EXPERIMENT)
   dir_simulations <- file.path("results_simulations", date_simulations)
 
+
   df_population_parameters <- readRDS(file.path(dir_simulations, "df_population_parameters.RDS"))
   df_estimators_parameters <- readRDS(file.path(dir_simulations, "df_estimators_parameters.RDS"))
   df_joined_results <- readRDS(file.path(dir_simulations, "processed_results", "joined_results.rds")) |>
@@ -92,6 +102,8 @@ server <- function(input, output) {
                                      includes_0,
                                      (sign(True_effect) == sign(Estimate)) & !includes_0)
     )
+
+
   df_stats <- readRDS(file.path(dir_simulations, "processed_results", "df_stats.rds"))
   output$dynamic_selectors <- renderUI({
     names_parameters <- names(df_population_parameters)[names(df_population_parameters) != "population_parameters_num"]
@@ -193,7 +205,7 @@ server <- function(input, output) {
   output$treatment_effect <- bindEvent(
     path_results_experiment(),
     x = renderPlot({
-      true_treatment_effect <- readRDS(file.path(path_results_experiment(), "average_outcome_df.RDS"))[outcome_type == "conditional", AB]
+      true_treatment_effect <- readRDS(file.path(path_results_experiment(), "average_outcome_df.RDS"))[trial == "BC" & outcome_type == "conditional", AB]
       selected_row() |>
         # dplyr::filter(population_parameters_num == 1) |>
         dplyr::select(matches("bY.+X[12]"), bY_A, bY_B, bY_C) |>
@@ -210,11 +222,20 @@ server <- function(input, output) {
     })
   )
 
+  output$tableTreatmentEffect <- bindEvent(
+    path_results_experiment(),
+    x = renderTable({
+      true_treatment_effect <- readRDS(file.path(path_results_experiment(), "average_outcome_df.RDS"))
+      true_treatment_effect
+    })
+  )
+
 
   renderCIPlot <- function(chosen_estimator_num) {
     covariate_names <- df_estimators_parameters[chosen_estimator_num,]$covariate_names |> paste(collapse = " - ")
     outcome_regression_model <- df_estimators_parameters[chosen_estimator_num, ]$outcome_regression_model
-    true_effect <- readRDS(file.path(path_results_experiment(), "average_outcome_df.RDS"))[outcome_type == "conditional", AB]
+    true_effect <- readRDS(file.path(path_results_experiment(), "average_outcome_df.RDS"))[outcome_type == "conditional", ]
+    true_effect <- true_effect[trial == "BC"]
     combined_results_df <- combined_results()
     result_plot <- combined_results_df |>
       dplyr::filter(Estimator_num == chosen_estimator_num) |>
@@ -223,10 +244,14 @@ server <- function(input, output) {
                     Adjustment = relevel(as.factor(Adjustment), ref = "Unadjusted")) |>
       dplyr::filter(Variance < 20) |> # filtering absurd variance estimates for graphical exploration
       ggplot() +
-      annotate(geom = "rect",
-               xmin = -Inf, xmax = 0, ymin = 0, ymax = Inf, fill = "grey", alpha = 0.3) +
-      annotate(geom = "rect",
-               xmin = -Inf, xmax = true_effect, ymin = true_effect, ymax = Inf, fill = "#A0D2AD", alpha = 0.5) +
+      # annotate(geom = "rect",
+      #          xmin = -Inf, xmax = 0, ymin = 0, ymax = Inf, fill = "grey", alpha = 0.3) +
+      geom_rect(aes(xmax = AB, ymin = AB, fill = trial), xmin = -Inf, ymax = Inf, alpha = 0.1, data = true_effect, inherit.aes = FALSE) +
+      # annotate(geom = "rect",
+      #          data = true_effect,
+      #          # xmin = -Inf, xmax = true_effect, ymin = true_effect, ymax = Inf, fill = "#A0D2AD", alpha = 0.5) +
+      #          xmin = -Inf, xmax = AB, ymin = AB, ymax = Inf, fill = trial, alpha = 0.5) +
+      scale_fill_brewer(palette = "Set1") +
       geom_point(aes(x = lb, y = ub, color = Anchored), alpha = 0.5) +
       geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "black") +
       # facet_wrap(~adjustment + model) +
