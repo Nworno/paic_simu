@@ -72,8 +72,8 @@ creating_population <- function(list_simulation_parameters) {
     id = 1:N_pop,
     X1 = eval(f_X1),
     X2 = eval(f_X2),
-    X3 = 0,
-    X4 = 0 # tentative d'une variable bimodale (mais pas utilisé finalement, coef à zéro)
+    X3 = eval(f_X3),
+    X4 = eval(f_X4)
   ) |>
     setkey("id")
 
@@ -101,9 +101,9 @@ creating_population <- function(list_simulation_parameters) {
     melt(id.vars = c("id"), variable.name = "ttt", value.name = "Y_theo")
 
   if (outcome_distribution == "normal") {
-    df_outcomes_pop_init[, Y_obs := Y_theo + rnorm(n = length(Y_theo), mean = 0, sd = 1)]
+    df_outcomes_pop_init[, Y_obs := Y_theo + rnorm(n = .N, mean = 0, sd = 1)]
   } else if (outcome_distribution == "binomial") {
-    df_outcomes_pop_init[, Y_obs := rbinom(n = length(Y_theo), size = 1, prob = plogis(Y_theo))]
+    df_outcomes_pop_init[, Y_obs := rbinom(n = .N, size = 1, prob = plogis(Y_theo))] # equivalent to ifelse(rnorm(.N, 0, pi/sqrt(3)) > 0, 1, 0) bc of the variance of the logistic function, thus normal and binomial outcome distributions are not interchangeable using plogis and 1/(1 + exp(-x))
     moy_outcomes <- tapply(df_outcomes_pop_init$Y_obs, df_outcomes_pop_init$ttt, mean, simplify = FALSE)
     if (any(moy_outcomes < 0.02 | moy_outcomes > 0.98)) { # arbitrary thresholds, to avoid downstreams problem with model fitting
       stop("Too extreme outcomes")
@@ -112,6 +112,7 @@ creating_population <- function(list_simulation_parameters) {
     stop("Unknown outcome distribution")
   }
 
+
   pop_init <- df_outcomes_pop_init[, Y_theo:= NULL][pop_init, on = "id"] |> data.table::dcast(formula = ... ~ ttt, value.var = "Y_obs")
 
   pop_init[, prob_BC := trial_assignement_prob(BC_trial_model, df = pop_init)]
@@ -119,7 +120,7 @@ creating_population <- function(list_simulation_parameters) {
              factor(levels = c(0, 1), labels = c("AC", "BC"))]
 
   pop_BC <- pop_init[trial == "BC"][sample(1:.N, N_pop, replace = TRUE), ][, ttt := rep_len(c("C", "B"), length.out = .N)] # one patient could be represented multiple times, but with such large sample sizes the correlation should not matter at all
-  pop_AC <- pop_init[trial == "AC"][sample(1:.N, N_pop, replace = TRUE)][, ttt := rep_len(c("C", "A"), length.out = .N)]
+  pop_AC <- pop_init[trial == "AC"][sample(1:.N, N_pop, replace = TRUE), ][, ttt := rep_len(c("C", "A"), length.out = .N)]
   all_individuals <- data.table::rbindlist(list(pop_BC, pop_AC), use.names = TRUE)
   average_all_individuals <- all_individuals[, lapply(.SD, mean), .SDcols = covariate_names, by = trial]
 
@@ -133,15 +134,20 @@ creating_population <- function(list_simulation_parameters) {
     c("trial" = list(average_all_individuals$trial)) |>
     as.data.table() |>
     melt(measure.vars = c("A", "B", "C"), variable.name = "ttt", value.name = "outcome")
+  # if (outcome_distribution == "binomial") average_conditional_outcome_all_individuals[, outcome :=  plogis(outcome)]
+
   marginal_outcome_all_individuals <- all_individuals[, lapply(.SD, mean), .SDcols = c("A", "B", "C"), by = c("trial")] |>
-    data.table::melt(id.vars = "trial", measure.vars = c("A", "B", "C"), value.name = "outcome", variable.name = "ttt")
+    data.table::melt(id.vars = "trial", measure.vars = c("A", "B", "C"), value.name = "outcome", variable.name = "ttt") |>
+    _[, .(trial, ttt, outcome  = log(outcome/(1 - outcome)))] # Retransforming to a linear scale to be able to calculate AB next
   average_outcome_df <- rbindlist(
     list("conditional" = average_conditional_outcome_all_individuals,
          "marginal" = marginal_outcome_all_individuals),
     use.names = TRUE,
     idcol = "outcome_type") |>
     dcast(trial + outcome_type ~ ttt, value.var = "outcome")
-  average_outcome_df[, AB := A - B]
+  average_outcome_df[, AB := A - B] # linear scale
+
+
   # population_variance <- df_outcomes[, .(var_Y_obs = var(Y_obs)), by = c("ttt")] |>
   #   dcast(. ~ ttt, value.var = "var_Y_obs") |>
   #   dplyr::rename(var_population = `.`) |>

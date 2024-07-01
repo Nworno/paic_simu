@@ -43,11 +43,11 @@ ui <- bs4DashPage(
                                 fluidRow(
                                   column(
                                     plotOutput("treatment_effect"),
-                                    width = 6
+                                    width = 8
                                   ),
                                   column(
                                     tableOutput("tableTreatmentEffect"),
-                                    width = 6
+                                    width = 4
                                   )
                                 )
                               ),
@@ -206,19 +206,38 @@ server <- function(input, output) {
     path_results_experiment(),
     x = renderPlot({
       true_treatment_effect <- readRDS(file.path(path_results_experiment(), "average_outcome_df.RDS"))[trial == "BC" & outcome_type == "conditional", AB]
-      selected_row() |>
-        # dplyr::filter(population_parameters_num == 1) |>
-        dplyr::select(matches("bY.+X[12]"), bY_A, bY_B, bY_C) |>
-        dplyr::mutate(conditional_AB_effect = true_treatment_effect) |>
-        dplyr::mutate(across(everything(), as.double)) |>
-        tidyr::pivot_longer(cols = everything(), names_to = "parameter", values_to = "value") |>
-        ggplot() +
-        geom_point(aes(y = parameter, x = value, color = parameter), size = 3) +
-        geom_segment(aes(y = parameter, xend = value, yend = parameter, color = parameter), arrow = arrow(length = unit(0.2, "inches"), type = "closed", angle = 15), arrow.fill = "black", x = 0, linetype = "solid") +
-        geom_vline(xintercept = 0, linetype = "dashed", colour = "black") +
-        geom_vline(xintercept = true_treatment_effect, linetype = "dashed", colour = "red") +
-        guides(color = "none") +
-        labs(title = "Outcome model: covariates coefficient values")
+      if (selected_row()$outcome_distribution == "normal") {
+        plot_treatment_effect <- selected_row() |>
+          # dplyr::filter(population_parameters_num == 1) |>
+          dplyr::select(matches("bY.+X[12]"), bY_A, bY_B, bY_C) |>
+          dplyr::mutate(conditional_AB_effect = true_treatment_effect) |>
+          dplyr::mutate(across(everything(), as.double)) |>
+          tidyr::pivot_longer(cols = everything(), names_to = "parameter", values_to = "value") |>
+          ggplot() +
+          geom_point(aes(y = parameter, x = value, color = parameter), size = 3) +
+          geom_segment(aes(y = parameter, xend = value, yend = parameter, color = parameter), arrow = arrow(length = unit(0.2, "inches"), type = "closed", angle = 15), arrow.fill = "black", x = 0, linetype = "solid") +
+          geom_vline(xintercept = 0, linetype = "dashed", colour = "black") +
+          geom_vline(xintercept = true_treatment_effect, linetype = "dashed", colour = "red") +
+          guides(color = "none") +
+          labs(title = "Outcome model: covariates coefficient values (linear scale)")
+      } else if (selected_row()$outcome_distribution == "binomial") {
+        exp_logit <- function(x) plogis(x) / (1 - plogis(x))
+        plot_treatment_effect <- selected_row() |>
+          dplyr::select(matches("bY.+X[12]"), bY_A, bY_B, bY_C) |>
+          dplyr::mutate(conditional_AB_effect = true_treatment_effect) |>
+          dplyr::mutate(across(everything(), as.double)) |>
+          tidyr::pivot_longer(cols = everything(), names_to = "parameter", values_to = "value") |>
+          dplyr::mutate(value = exp_logit(value)) |>
+          ggplot() +
+          geom_point(aes(y = parameter, x = value, color = parameter), size = 3) +
+          geom_segment(aes(y = parameter, xend = value, yend = parameter, color = parameter), arrow = arrow(length = unit(0.2, "inches"), type = "closed", angle = 15), arrow.fill = "black", x = exp_logit(0), linetype = "solid") +
+          geom_vline(xintercept = exp_logit(0), linetype = "dashed", colour = "black") +
+          geom_vline(xintercept = exp_logit(true_treatment_effect), linetype = "dashed", colour = "red") +
+          guides(color = "none") +
+          labs(title = "Outcome model: covariates coefficient values (OR)") +
+          scale_x_continuous(limits = c(0, NA))
+      }
+      plot_treatment_effect
     })
   )
 
@@ -226,7 +245,18 @@ server <- function(input, output) {
     path_results_experiment(),
     x = renderTable({
       true_treatment_effect <- readRDS(file.path(path_results_experiment(), "average_outcome_df.RDS"))
-      true_treatment_effect
+      if (selected_row()$outcome_distribution == "normal") {
+        true_treatment_effect
+      } else if (selected_row()$outcome_distribution == "binomial") {
+        browser()
+        dplyr::mutate(true_treatment_effect,
+                      across(c(A, B, C), \(x) plogis(x)),
+                      AB = exp(AB)) |>
+          dplyr::rename_with(.fn = \(x) paste0("prop ", x), .cols = c(A, B, C)) |>
+          dplyr::rename(`odds AB` = AB)
+      } else {
+        stop()
+      }
     })
   )
 
@@ -285,62 +315,27 @@ server <- function(input, output) {
 
 
 
-  output$CIPlot1 <- bindEvent(path_results_experiment(), x = renderPlot(renderCIPlot(1)))
-  output$CIPlot2 <- bindEvent(path_results_experiment(), x = renderPlot(renderCIPlot(2)))
-  output$CIPlot3 <- bindEvent(path_results_experiment(), x = renderPlot(renderCIPlot(3)))
-
-  output$PlotIndicators1 <- bindEvent(path_results_experiment(),
-                                    x = renderPlot(renderPlotIndicators(num_experiment(), 1)))
-  output$PlotIndicators2 <- bindEvent(path_results_experiment(),
-                                    x = renderPlot(renderPlotIndicators(num_experiment(), 2)))
-  output$PlotIndicators3 <- bindEvent(path_results_experiment(),
-                                    x = renderPlot(renderPlotIndicators(num_experiment(), 3)))
-
-
+  list_results_box <- lapply(1:nrow(df_estimators_parameters), function(row_num) {
+    output[[paste0("CIPlot", row_num)]] <- bindEvent(path_results_experiment(), x = renderPlot(renderCIPlot(row_num)))
+    output[[paste0("PlotIndicators", row_num)]] <- bindEvent(path_results_experiment(),
+                                                             x = renderPlot(renderPlotIndicators(num_experiment(), row_num)))
+    bs4TabCard(width = 12,
+               title = paste0("Estimator results: ", df_estimators_parameters[row_num,]$outcome_regression_model),
+               tabPanel(
+                 title = "CI",
+                 closable = TRUE,
+                 plotOutput(paste0("CIPlot", row_num))
+               ),
+               tabPanel(
+                 title = "Indicators",
+                 closable = TRUE,
+                 plotOutput(paste0("PlotIndicators", row_num))
+               )
+    )
+  })
   output$results_box <- renderUI(
-    tagList(
-    bs4TabCard(width = 12,
-               title = paste0("Estimator results: ", df_estimators_parameters[1,]$outcome_regression_model),
-               tabPanel(
-                 title = "CI",
-                 closable = TRUE,
-                 plotOutput("CIPlot1")
-               ),
-               tabPanel(
-                 title = "Indicators",
-                 closable = TRUE,
-                 plotOutput("PlotIndicators1")
-               )
-    ),
-    bs4TabCard(width = 12,
-               title = paste0("Estimator results: ", df_estimators_parameters[2,]$outcome_regression_model),
-               tabPanel(
-                 title = "CI",
-                 closable = TRUE,
-                 plotOutput("CIPlot2")
-               ),
-               tabPanel(
-                 title = "Indicators",
-                 closable = TRUE,
-                 plotOutput("PlotIndicators2")
-               )
-    ),
-    bs4TabCard(width = 12,
-               title = paste0("Estimator results: ", df_estimators_parameters[3,]$outcome_regression_model),
-               tabPanel(
-                 title = "CI",
-                 closable = TRUE,
-                 plotOutput("CIPlot3")
-               ),
-               tabPanel(
-                 title = "Indicators",
-                 closable = TRUE,
-                 plotOutput("PlotIndicators3")
-               )
-    )
-    )
+    do.call(tagList, list_results_box)
   )
-
 }
 
 shinyApp(ui = ui, server = server)

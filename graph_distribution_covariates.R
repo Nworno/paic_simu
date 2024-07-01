@@ -14,7 +14,7 @@ source("data_generation.R")
 # Drawing covariates distributions
 ##################################
 
-N_pop <- 10^6
+N_pop <- 10^5
 # path_experiment <- file.path("results_simulations", "test")
 # if (!dir.exists(path_experiment)) dir.create(path_experiment)
 path_experiment <- file.path("results_simulations", DATE_EXPERIMENT)
@@ -29,11 +29,11 @@ for (num_population in df_population_parameters$population_parameters_num) {
     unlist(recursive = TRUE)
   populations <- creating_population(list_simulation_parameters)
   pop_init <- populations$pop_init
+  average_outcome_df <- populations$average_outcome_df
+  average_outcome_df[, trial := factor(trial, levels = c("AC", "BC"), labels = c("AC (IPD)", "BC (AgD)"))]
 
   all_individuals <- pop_init |>
     data.table::melt(measure.vars = patterns("X[0-9]+"), value.name = "variable_value", number = as.numerical) |>
-    # Because they are the only variables used for now
-    dplyr::filter(variable %in% c("X1", "X2")) |>
     data.table::melt(measure.vars = c("A", "B", "C"), value.name = "Y_obs", variable.name = "ttt", number = as.numerical) |>
     dplyr::mutate(trial = factor(trial, levels = c("AC", "BC"), labels = c("AC (IPD)", "BC (AgD)")))
 
@@ -65,24 +65,40 @@ for (num_population in df_population_parameters$population_parameters_num) {
                       data = all_individuals |>
                         dplyr::group_by(trial, ttt) |>
                         dplyr::summarise(mean_Y_obs = mean(Y_obs), sd_Y_obs = sd(Y_obs), low = mean_Y_obs - sd_Y_obs, up = mean_Y_obs + sd_Y_obs)) +
+      geom_point(aes(ttt, Y_obs, color = "conditional"), size = 3, data = average_outcome_df[outcome_type == "conditional", ] |>
+                   melt(measure.vars = c("A", "B", "C"), value.name = "Y_obs", variable.name = "ttt")) +
       facet_wrap(facets = "trial", ncol = 2, scales = "free_x") +
-      labs(x = NULL, y = NULL, title = "Outcome distribution")
+      scale_color_manual(values = c("conditional" = "red"), name = NULL, labels = c("conditional" = "Conditional Effect")) +
+      labs(x = NULL, y = NULL, title = "Marginal outcome distribution")
 
   } else if (list_simulation_parameters$outcome_distribution == "binomial") {
     # plot the distribution of the outcome as a barplot, with proportions of the outcome as stack bars for each treatment group
-    plot_outcome_distribution <- all_individuals |>
+    browser()
+    marginal_outcome_distribution <- all_individuals |>
       dplyr::mutate(Y_obs = ifelse(Y_obs > 0, 1, 0), fill = ttt) |>
       dplyr::group_by(trial, ttt) |>
       dplyr::summarize("0" = 1L - mean(Y_obs), "1" = mean(Y_obs)) |>
-      tidyr::pivot_longer(cols = c("0", "1"), names_to = "prop_Y_obs", values_to = "value") |>
-      # dplyr::count(Y_obs) |>
-      # dplyr::summarize(Y_obs = dplyr::count(Y_obs), .by = c("trial", "ttt")) |>
+      tidyr::pivot_longer(cols = c("0", "1"), names_to = "prop_Y_obs", values_to = "value")
+
+    conditional_outcome_distribution <- average_outcome_df[outcome_type == "conditional", ] |>
+      melt(measure.vars = c("A", "B", "C"), id.vars = c("trial"), variable.name = "ttt") |>
+      _[, .(value_0 = 1 - value, trial, ttt, value)] |>
+      melt(measure.vars = c("value", "value_0"), variable.name = "prop_Y_obs") |>
+      _[, .(prop_Y_obs = factor(prop_Y_obs, levels = c("value_0", "value"), labels = c("0", "1")), trial, ttt, value)]
+
+    plot_outcome_distribution <- rbindlist(list("marginal" = marginal_outcome_distribution,
+                                                "conditional" = conditional_outcome_distribution),
+                                           use.names = TRUE,
+                                           idcol = "distribution",
+                                           ) |>
       ggplot() +
       geom_bar(aes(y = value, x = ttt, fill = prop_Y_obs), stat = "identity", alpha = 0.4) +
       # geom_bar(aes(Y_obs, position = "dodge", alpha = 0.4) +
-      facet_wrap(facets = "trial", ncol = 1, scales = "free") +
+      facet_grid("distribution ~ trial") +
       # geom_bar(aes(Y_obs, fill = trial), alpha = 0.4) +
       labs(x = NULL, y = NULL, title = "Outcome distribution")
+
+
   }
   # print(plot_outcome_distribution)
   print(num_population)
