@@ -1,4 +1,4 @@
-options(mc.cores = 8)
+options(mc.cores = 1)
 
 source("estimators.R")
 source("data_generation.R")

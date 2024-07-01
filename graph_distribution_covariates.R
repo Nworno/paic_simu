@@ -82,9 +82,9 @@ for (num_population in df_population_parameters$population_parameters_num) {
 
     conditional_outcome_distribution <- average_outcome_df[outcome_type == "conditional", ] |>
       melt(measure.vars = c("A", "B", "C"), id.vars = c("trial"), variable.name = "ttt") |>
-      _[, .(value_0 = 1 - value, trial, ttt, value)] |>
+      data.table:::DT(, .(value_0 = 1 - value, trial, ttt, value)) |>
       melt(measure.vars = c("value", "value_0"), variable.name = "prop_Y_obs") |>
-      _[, .(prop_Y_obs = factor(prop_Y_obs, levels = c("value_0", "value"), labels = c("0", "1")), trial, ttt, value)]
+      data.table:::DT(, .(prop_Y_obs = factor(prop_Y_obs, levels = c("value_0", "value"), labels = c("0", "1")), trial, ttt, value))
 
     plot_outcome_distribution <- rbindlist(list("marginal" = marginal_outcome_distribution,
                                                 "conditional" = conditional_outcome_distribution),

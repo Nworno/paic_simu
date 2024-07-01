@@ -138,7 +138,7 @@ creating_population <- function(list_simulation_parameters) {
 
   marginal_outcome_all_individuals <- all_individuals[, lapply(.SD, mean), .SDcols = c("A", "B", "C"), by = c("trial")] |>
     data.table::melt(id.vars = "trial", measure.vars = c("A", "B", "C"), value.name = "outcome", variable.name = "ttt") |>
-    _[, .(trial, ttt, outcome  = log(outcome/(1 - outcome)))] # Retransforming to a linear scale to be able to calculate AB next
+    data.table:::DT(, .(trial, ttt, outcome  = log(outcome/(1 - outcome)))) # Retransforming to a linear scale to be able to calculate AB next
   average_outcome_df <- rbindlist(
     list("conditional" = average_conditional_outcome_all_individuals,
          "marginal" = marginal_outcome_all_individuals),
