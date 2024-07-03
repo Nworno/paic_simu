@@ -7,12 +7,12 @@ library(data.table)
 df_population_parameters <- list(
   N_RCT  = c(500),
   prop_X1 = 0.5, # Variable binaire, prevalence dans la population
-  bT = 3,
+  bT = c(0.5),
   bT_X1 = c(-0.5),   # Effet de la variable binaire sur la probabilité d'être dans l'essai BC
   bT2_X1 = c(0.5),   # Effet de la variable binaire sur la probabilité d'être dans l'essai BC
   bT_X2 = c(-0.5),   # Effet de la variable continue X2...
   bT2_X2 = c(0.5),   # Effet de la variable continue X2...
-  fbT = c(0.5, 2),
+  fbT = c(0.1, 0.3, 0.5),
   bT_X3 = 0.5,
   bT_X4 = -0.5,
   bT2_X3 = 0.5,
@@ -35,7 +35,7 @@ df_population_parameters <- list(
   f_X3 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1.5))))),
   f_X4 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1.5))))),
   bY_A = 1,  # Effet de A par rapport à C
-  bY_B = 0.3,  # Effet de B par rapport à C
+  bY_B = c(0.3, 1),  # Effet de B par rapport à C
   bY_C = 0,    # Pas d'effet de C sur l'outcome
   BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2 + bT_X3 * X3 + bT2_X3 * X3^2 + bT_X4 * X4 + bT2_X4 * X4^2)), # Modèle d'attribution de l'essai BC
   outcome_distribution = c("normal", "binomial"),

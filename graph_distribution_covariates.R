@@ -73,7 +73,7 @@ for (num_population in df_population_parameters$population_parameters_num) {
 
   } else if (list_simulation_parameters$outcome_distribution == "binomial") {
     # plot the distribution of the outcome as a barplot, with proportions of the outcome as stack bars for each treatment group
-    browser()
+    # browser()
     marginal_outcome_distribution <- all_individuals |>
       dplyr::mutate(Y_obs = ifelse(Y_obs > 0, 1, 0), fill = ttt) |>
       dplyr::group_by(trial, ttt) |>

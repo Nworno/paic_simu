@@ -43,11 +43,11 @@ ui <- bs4DashPage(
                                 fluidRow(
                                   column(
                                     plotOutput("treatment_effect"),
-                                    width = 8
+                                    width = 7
                                   ),
                                   column(
                                     tableOutput("tableTreatmentEffect"),
-                                    width = 4
+                                    width = 5
                                   )
                                 )
                               ),
