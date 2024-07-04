@@ -15,24 +15,23 @@ unadjusted_estimator <- function(trial_AC,
     naive_conditional_model_AC <- glm(Y_obs ~ ttt, family = glm_family, data = trial_AC)
     naive_conditional_model_BC <- glm(Y_obs ~ ttt, family = glm_family, data = trial_BC)
     naive_AB <- naive_conditional_model_AC$coefficients[["tttA"]] - naive_conditional_model_BC$coefficients[["tttB"]]
+    # vcov(naive_conditional_model_AC, complete = TRUE)["tttA", "tttA"] is equivalent to var(trial_AC[ttt == "A", Y_obs])/sum(trial_AC$ttt == "A") + var(trial_AC[ttt == "C", Y_obs])/sum(trial_AC$ttt == "C")
+    var_AB <- vcov(naive_conditional_model_AC, complete = TRUE)["tttA", "tttA"] + vcov(naive_conditional_model_BC)["tttB", "tttB"]
+
   } else {
     both_trials <- rbind(trial_AC[ttt == "A", .(Y_obs, ttt)], trial_BC[ttt == "B", .(Y_obs, ttt)])
     both_trials[ ,ttt := relevel(ttt, ref = "B")]
     naive_conditional_model_AB <- glm(Y_obs ~ ttt, family = glm_family, data = both_trials)
     naive_AB <- naive_conditional_model_AB$coefficients[["tttA"]]
+    var_AB <- vcov(naive_conditional_model_AB)["tttA", "tttA"]
   }
-  return(naive_AB)
+  return(list("estimate" = naive_AB, "variance" = var_AB))
 }
 
 # (Unanchored) unadjusted observed effect in pop_init
 run_unadjusted_estimator <- function(trial_AC, trial_BC, anchored, glm_family) {
-  estimate <- unadjusted_estimator(trial_AC, trial_BC, anchored, glm_family)
-  boot_estimates <- lapply(1:N_BOOT_ITER, \(x) unadjusted_estimator(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
-                                                                    trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
-                                                                    anchored,
-                                                                    glm_family))
-  variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var(na.rm = TRUE)
-  return(list("estimate" = estimate, "variance" = variance))
+  result <- unadjusted_estimator(trial_AC, trial_BC, anchored, glm_family)
+  return(list("estimate" = result$estimate, "variance" = result$variance))
 }
 
 
@@ -93,7 +92,6 @@ propensity_score <- function(trial_AC,
       stop("No weight estimation method provided")
     }
     if (studying_populations) {
-      print("oh yeah")
       return(trial_weights)
     }
     if (outcome_family$family == "binomial") {
@@ -123,7 +121,6 @@ propensity_score <- function(trial_AC,
       stop("No weighting method provided")
     }
     if (studying_populations) {
-      print("oh yeah")
       return(trial_weights)
     }
 
@@ -136,34 +133,70 @@ propensity_score <- function(trial_AC,
       outcome_model <- as.formula(Y_obs ~ ttt)
     }
   }
+    df[, trial_weights := trial_weights]
+
   # ALl estimated in one step, but similar as doing it in two steps when not adjusted on any confoundings. The "anchored" comparison is performed by the " + trial" in the model
-  fitted_glm <- glm(outcome_model,
-                    family = outcome_family,
-                    data = df,
-                    weights = trial_weights)
+  # fitted_glm <- glm(outcome_model,
+  #                   family = outcome_family,
+  #                   data = df,
+  #                   weights = trial_weights)
+  design_glm <- svydesign(id=~1, weights =~trial_weights, data = df)
+  fitted_glm <- survey::svyglm(outcome_model, design = design_glm, family = outcome_family)
   estimate_AB <- fitted_glm$coefficients[["tttA"]]
-  return(estimate_AB)
+
+  # variance
+  weighted.var <- function(x, w) {
+    scaled_w <- w / sum(w)
+    var(x)
+    sum(scaled_w * (x - weighted.mean(x, scaled_w))^2)/(sum(scaled_w) - 1/sum(w))
+  }
+  variance_BC <- df[trial == "BC", .(var = var(Y_obs)/.N), by = ttt][, var] |> sum()
+  variance_AC <- df[trial == "AC"][, .(var = weighted.var(Y_obs, trial_weights)/sum(trial_weights)), by = ttt][, var] |> sum()
+  estimate_A_and_C <- df[trial == "AC"][, .(mean = weighted.mean(Y_obs, trial_weights)), by = ttt]
+
+  estimate_AC <- estimate_A_and_C[ttt == "A", mean] - estimate_A_and_C[ttt == "C", mean]
+
+  return(list(estimate_AB = estimate_AB, estimate_AC = estimate_AC, variance_AC = variance_AC, variance_BC = variance_BC))
 }
 
 run_propensity_score <- function(trial_AC, trial_BC, covariate_names, assignment_model, anchored, weight_estimation_method, outcome_family, studying_populations = FALSE) {
-  estimate <- propensity_score(trial_AC,
-                               trial_BC,
-                               covariate_names,
-                               assignment_model,
-                               anchored,
-                               weight_estimation_method,
-                               outcome_family,
-                               studying_populations)
-  boot_estimates <- lapply(1:N_BOOT_ITER, \(x) propensity_score(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = c("ttt")],
-                                                                trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = c("ttt")],
-                                                                covariate_names,
-                                                                assignment_model,
-                                                                anchored,
-                                                                weight_estimation_method,
-                                                                outcome_family,
-                                                                studying_populations))
-  variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var()
-  return(list("estimate" = estimate, "variance" = variance))
+  browser()
+  results <- propensity_score(trial_AC,
+                              trial_BC,
+                              covariate_names,
+                              assignment_model,
+                              anchored,
+                              weight_estimation_method,
+                              outcome_family,
+                              studying_populations)
+  estimate_AB <- results$estimate_AB
+  variance_BC <- results$variance_BC
+  # variance_AC <- results$variance_AC
+  boot_estimates_AC <- lapply(1:N_BOOT_ITER, \(x) propensity_score(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = c("ttt")],
+                                                           trial_BC,
+                                                           covariate_names,
+                                                           assignment_model,
+                                                           anchored,
+                                                           weight_estimation_method,
+                                                           outcome_family,
+                                                           studying_populations)$estimate_AC)
+
+  variance_AC <- Filter(is.numeric, boot_estimates_AC) |> unlist() |> var()
+
+  # Should be close to consistent with bootstrap
+  # boot_estimates_var_AC <- lapply(1:1000, \(x) propensity_score(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = c("ttt")],
+  #                                                           trial_BC,
+  #                                                           covariate_names,
+  #                                                           assignment_model,
+  #                                                           anchored,
+  #                                                           weight_estimation_method,
+  #                                                           outcome_family,
+  #                                                           studying_populations)$variance_AC)
+  # mean_variance_AC <- Filter(is.numeric, boot_estimates_var_AC) |> unlist() |> mean()
+
+  variance_AB <- variance_BC + variance_AC
+
+  return(list("estimate" = estimate_AB, "variance" = variance_AB))
 }
 
 ############################
