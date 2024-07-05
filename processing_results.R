@@ -15,10 +15,10 @@ nested_list_results_df <- rapply(list_files, classes = "character", how = "repla
 long_df_results <- lapply(nested_list_results_df, \(l) {
   l_wo_errors <- lapply(l, \(x) Filter(\(y) !"try-error" %in% class(y), x))
   # l_wo_errors <- lapply(l, \(x) lapply(x, \(y) Filter(\(z) !"try-error" %in% class(z) | !"character" %in% class(z), y)))
-  lapply(l_wo_errors, rbindlist, idcol = "iteration")
+  lapply(l_wo_errors, rbindlist, idcol = "iteration", use.names = TRUE)
   }) |>
-  lapply(rbindlist, idcol = "estimator_num") |>
-  rbindlist(idcol = "population_parameters_num")
+  lapply(rbindlist, idcol = "estimator_num", use.names = TRUE) |>
+  rbindlist(idcol = "population_parameters_num", use.names = TRUE)
 long_df_results[, estimator_num := gsub(pattern = ".*(?<=experiment_)(\\d+)(?=\\.RDS).*", replacement = "\\1", x = estimator_num, perl = TRUE)]
 
 
@@ -33,7 +33,7 @@ df_true_effects <- list.dirs(dir_experience_results) |>
     return(alist)
     }) |>
   unlist(recursive = FALSE) |>
-  rbindlist(idcol = "population_parameters_num")
+  rbindlist(idcol = "population_parameters_num", use.names = TRUE)
 
 df_population_parameters <- readRDS(file = file.path(dir_experience_results, "df_population_parameters.RDS")) |>
   dplyr::mutate(across(where(is.list), as.character))

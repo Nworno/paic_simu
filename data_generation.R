@@ -137,8 +137,9 @@ creating_population <- function(list_simulation_parameters) {
   # if (outcome_distribution == "binomial") average_conditional_outcome_all_individuals[, outcome :=  plogis(outcome)]
 
   marginal_outcome_all_individuals <- all_individuals[, lapply(.SD, mean), .SDcols = c("A", "B", "C"), by = c("trial")] |>
-    data.table::melt(id.vars = "trial", measure.vars = c("A", "B", "C"), value.name = "outcome", variable.name = "ttt") |>
-    data.table:::DT(, .(trial, ttt, outcome  = log(outcome/(1 - outcome)))) # Retransforming to a linear scale to be able to calculate AB next
+    data.table::melt(id.vars = "trial", measure.vars = c("A", "B", "C"), value.name = "outcome", variable.name = "ttt")
+  if (outcome_distribution == "binomial") marginal_outcome_all_individuals <- marginal_outcome_all_individuals[ ,.(trial, ttt, outcome  = log(outcome/(1 - outcome)))] # setting back to linear scale to be able to estimate AB as A - B
+
   average_outcome_df <- rbindlist(
     list("conditional" = average_conditional_outcome_all_individuals,
          "marginal" = marginal_outcome_all_individuals),

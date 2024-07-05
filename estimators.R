@@ -6,6 +6,12 @@
 ########## Unadjusted estimator
 ##############################
 
+weighted.var <- function(x, w) {
+  scaled_w <- w / sum(w)
+  sum(scaled_w * (x - weighted.mean(x, scaled_w))^2)/(sum(scaled_w) - 1/sum(w))
+}
+
+
 # (Anchored) naive observed effect in pop_init
 unadjusted_estimator <- function(trial_AC,
                                  trial_BC,
@@ -73,7 +79,7 @@ propensity_score <- function(trial_AC,
                              studying_populations = FALSE) {
   if (anchored) {
     ######### Anchored
-    df <- data.table::rbindlist(list("AC" = trial_AC, "BC" = trial_BC), idcol = "trial", fill = TRUE)
+    df <- data.table::rbindlist(list("AC" = trial_AC, "BC" = trial_BC), idcol = "trial", fill = TRUE, use.names = TRUE)
     df[, ttt := relevel(as.factor(ttt), ref = "B")]
     stopifnot(levels(df$ttt)[[1]] == "B")
     if (weight_estimation_method == "max_likelihood") {
@@ -104,7 +110,7 @@ propensity_score <- function(trial_AC,
     ######## Non-anchored
     trial_A <- trial_AC[ttt == "A"]
     trial_B <- trial_BC[ttt == "B"]
-    df <- data.table::rbindlist(list(trial_A, trial_B))
+    df <- data.table::rbindlist(list(trial_A, trial_B), use.names = TRUE)
     if (weight_estimation_method == "max_likelihood") {
       #### Propensity score weights
       df[, ttt := relevel(as.factor(ttt), ref = "A")]
@@ -123,7 +129,6 @@ propensity_score <- function(trial_AC,
     if (studying_populations) {
       return(trial_weights)
     }
-
     df[, ttt := relevel(as.factor(ttt), ref = "B")]
     stopifnot(levels(df$ttt)[[1]] == "B")
     if (outcome_family$family == "binomial") {
@@ -140,27 +145,23 @@ propensity_score <- function(trial_AC,
   #                   family = outcome_family,
   #                   data = df,
   #                   weights = trial_weights)
-  design_glm <- svydesign(id=~1, weights =~trial_weights, data = df)
+  design_glm <- survey::svydesign(id=~1, weights =~trial_weights, data = df)
   fitted_glm <- survey::svyglm(outcome_model, design = design_glm, family = outcome_family)
   estimate_AB <- fitted_glm$coefficients[["tttA"]]
 
   # variance
-  weighted.var <- function(x, w) {
-    scaled_w <- w / sum(w)
-    var(x)
-    sum(scaled_w * (x - weighted.mean(x, scaled_w))^2)/(sum(scaled_w) - 1/sum(w))
-  }
+
+  # These two variances effectively only count one arm in the case of unanchored comparisons
   variance_BC <- df[trial == "BC", .(var = var(Y_obs)/.N), by = ttt][, var] |> sum()
   variance_AC <- df[trial == "AC"][, .(var = weighted.var(Y_obs, trial_weights)/sum(trial_weights)), by = ttt][, var] |> sum()
+  # Estimate AC
   estimate_A_and_C <- df[trial == "AC"][, .(mean = weighted.mean(Y_obs, trial_weights)), by = ttt]
-
-  estimate_AC <- estimate_A_and_C[ttt == "A", mean] - estimate_A_and_C[ttt == "C", mean]
+  if (anchored) estimate_AC <- estimate_A_and_C[ttt == "A", mean] - estimate_A_and_C[ttt == "C", mean] else estimate_AC <- estimate_A_and_C[ttt == "A", mean]
 
   return(list(estimate_AB = estimate_AB, estimate_AC = estimate_AC, variance_AC = variance_AC, variance_BC = variance_BC))
 }
 
 run_propensity_score <- function(trial_AC, trial_BC, covariate_names, assignment_model, anchored, weight_estimation_method, outcome_family, studying_populations = FALSE) {
-  browser()
   results <- propensity_score(trial_AC,
                               trial_BC,
                               covariate_names,
@@ -216,7 +217,8 @@ regression_model <- function(trial_AC,
       ### Classic regression model
       df_full_ipd <- data.table::rbindlist(list("AC" = trial_AC, "BC" = trial_BC),
                                            idcol = "trial",
-                                           fill = TRUE)
+                                           fill = TRUE,
+                                           use.names = TRUE)
       if (anchored) {
         # 2 differences between anchored/unanchored:
         # "two times" more data to estimate predictors' effect + 'trial' variable in the model
@@ -229,11 +231,14 @@ regression_model <- function(trial_AC,
       stopifnot(levels(df_full_ipd$ttt)[[1]] == "B")
       mean_covariates_BC <- colMeans(trial_BC[, ..covariate_names])
       df_full_ipd_centered <- sweep(df_full_ipd[, ..covariate_names], 2, mean_covariates_BC, "-") |>
-        cbind(df_full_ipd[, .(Y_obs, ttt, trial)])
+        cbind(df_full_ipd[, .(Y_obs, ttt, trial)]) |> data.table::as.data.table()
       fitted_model <- glm(outcome_regression_model,
                           data = df_full_ipd_centered,
                           family = outcome_family)
       estimate_AB <- fitted_model$coefficients[["tttA"]]
+      variance_AB <- vcov(fitted_model)["tttA", "tttA"]
+      # summary(fitted_model)
+      # df_full_ipd_centered[, var(Y_obs)/.N, by = c("trial", "ttt")][, V1] |> sum()
     } else {
       #### STC
       if (anchored) {
@@ -254,31 +259,41 @@ regression_model <- function(trial_AC,
                              data = centered_trial_AC,
                              family = outcome_family)
       if (anchored) {
-        estimate_BC <- glm(Y_obs ~ ttt, data = trial_BC, family = outcome_family)$coefficients[["tttB"]]
+        fitted_model_BC <- glm(Y_obs ~ ttt, data = trial_BC, family = outcome_family)
+        estimate_BC <- fitted_model_BC$coefficients[["tttB"]]
         estimate_AC <- fitted_model_AC$coefficients[["tttA"]]
         estimate_AB <- estimate_AC - estimate_BC
+
+        variance_AC <- vcov(fitted_model_AC)["tttA", "tttA"]
+        variance_BC <- vcov(fitted_model_BC)["tttB", "tttB"]
+        variance_AB <- variance_AC + variance_BC
       } else {
-        estimate_B <- glm(Y_obs ~ 1, data = trial_BC, family = outcome_family)$coefficients[["(Intercept)"]]
+        fitted_model_B <- glm(Y_obs ~ 1, data = trial_BC, family = outcome_family)
+        estimate_B <- fitted_model_B$coefficients[["(Intercept)"]]
         estimate_A <- fitted_model_AC$coefficients[["(Intercept)"]]
         estimate_AB <- estimate_A - estimate_B
+
+        variance_AC <- vcov(fitted_model_AC)["(Intercept)", "(Intercept)"]
+        variance_BC <- vcov(fitted_model_B)["(Intercept)", "(Intercept)"]
+        variance_AB <- variance_AC + variance_BC
       }
     }
-  return(estimate_AB)
+  return(list(estimate_AB = estimate_AB, variance_AB = variance_AB))
 }
 
 run_regression_model <- function(trial_AC, trial_BC, outcome_regression_model, covariate_names, full_ipd, anchored, outcome_family) {
-  estimate <- regression_model(trial_AC, trial_BC, outcome_regression_model, covariate_names, anchored, full_ipd, outcome_family)
-  boot_estimates <- lapply(1:N_BOOT_ITER, \(x) {
-    regression_model(trial_AC[sample(1:.N, size = .N, replace = TRUE), .SD, by = ttt],
-                     trial_BC[sample(1:.N, size = .N, replace = TRUE), .SD, by = ttt],
-                     outcome_regression_model,
-                     covariate_names,
-                     anchored,
-                     full_ipd,
-                     outcome_family)
-  })
-  variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var()
-  return(list("estimate" = estimate, "variance" = variance))
+  results <- regression_model(trial_AC, trial_BC, outcome_regression_model, covariate_names, anchored, full_ipd, outcome_family)
+  # boot_estimates <- lapply(1:N_BOOT_ITER, \(x) {
+  #   regression_model(trial_AC[sample(1:.N, size = .N, replace = TRUE), .SD, by = ttt],
+  #                    trial_BC[sample(1:.N, size = .N, replace = TRUE), .SD, by = ttt],
+  #                    outcome_regression_model,
+  #                    covariate_names,
+  #                    anchored,
+  #                    full_ipd,
+  #                    outcome_family)
+  # })
+  # variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var()
+  return(list("estimate" = results$estimate_AB, "variance" = results$variance_AB))
 }
 
 

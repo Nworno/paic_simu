@@ -38,7 +38,7 @@ df_population_parameters <- list(
   outcome_generation_formula =  c(bquote(
     bY_X1*X1 + bY_X2 * X2 + bY_X3 * X3 + bY_X4 * X4 + (bY_A + bY_A_X1*X1 + bY_A_X2*X2 + bY_A_X3*X3 + bY_A_X4*X4) * A +  bY_B*B + bY_C*C
   ))
-) |> 
+) |>
   expand.grid() |>
   as.data.table()
 df_population_parameters[, population_parameters_num := 1:.N]
@@ -60,23 +60,23 @@ creating_population <- function(list_simulation_parameters) {
     X4 = binary_marker * rnorm(N_pop, -1.5, 1) + (1 - binary_marker) * rnorm(N_pop, 1.5, 1) # tentative d'une variable bimodale (mais pas utilisé finalement, coef à zéro)
   ) |>
     setkey("id")
-  
-  
+
+
   trial_assignement_prob <- function(trial_assignment_model, df) {
     predicted <- with(df, eval(trial_assignment_model))
     return(plogis(predicted))
   }
-  
+
   predict_outcome <- function(outcome_model, df) {
     with(df, eval(outcome_model))
   }
-  
+
   pop_init[, prob_w_trial_AC := trial_assignement_prob(AC_trial_model, df = pop_init)]
   pop_init[, prob_w_trial_BC := trial_assignement_prob(BC_trial_model, df = pop_init)]
   # AC_pop_init <- pop_init[sample(id, size = 10^6, prob = prob_w_trial_AC, replace = TRUE), ]
   # Drawing a very large population with BC characteristics to compute theoretical outcomes
-  BC_pop_init <- pop_init[sample(id, size = 10^6, prob = prob_w_trial_BC, replace = TRUE), ] 
-  
+  BC_pop_init <- pop_init[sample(id, size = 10^6, prob = prob_w_trial_BC, replace = TRUE), ]
+
   covariate_names <- c("X1", "X2", "X3", "X4")
   df_outcomes <- sapply(list(A = BC_pop_init[, .(A = 1L, B = 0L, C = 0L, (.SD)), .SDcols = covariate_names],
                              B = BC_pop_init[, .(A = 0L, B = 1L, C = 0L, (.SD)), .SDcols = covariate_names],
@@ -88,9 +88,9 @@ creating_population <- function(list_simulation_parameters) {
     as.data.table() |>
     melt(id.vars = c("id"), variable.name = "ttt", value.name = "Y_theo")
   df_outcomes[, Y_obs := Y_theo + rnorm(n = length(Y_theo), mean = 0, sd = 1)]
-  
+
   average_BC_pop_init <- BC_pop_init[, lapply(.SD, mean), .SDcols = covariate_names]
-  
+
   average_conditional_outcome <- sapply(list("A" = average_BC_pop_init[, .(A = 1L, B = 0L, C = 0L, (.SD)), .SDcols = covariate_names],
                                              "B" = average_BC_pop_init[, .(A = 0L, B = 1L, C = 0L, (.SD)), .SDcols = covariate_names],
                                              "C" = average_BC_pop_init[, .(A = 0L, B = 0L, C = 1L, (.SD)), .SDcols = covariate_names]),
@@ -108,7 +108,7 @@ creating_population <- function(list_simulation_parameters) {
     dcast(outcome_type ~ ttt, value.var = "outcome")
   average_outcome_df[, AB := A - B]
   if (average_outcome_df[outcome_type == "conditional", AB] == 0) average_outcome_df[, AB := 0]
-  
+
   return(list(
     "pop_init" = pop_init,
     "df_outcomes" = df_outcomes,
@@ -121,11 +121,11 @@ indirect_comparisons <- function(pop_init,
                                  df_outcomes,
                                  N_RCT,
                                  covariate_names) { # info score de propension
-  
+
   #############################
   ############## Drawing trials
   #############################
-  
+
   # selected_individuals_AC <- pop_init[sample(id, N_RCT, replace = FALSE, prob = prob_w_trial_AC)][
   #   , ttt := rep_len(c("A", "C"), length.out = .N)]
   # selected_outcomes_AC <- df_outcomes[selected_individuals_AC, on = c("id", "ttt")][
@@ -133,8 +133,8 @@ indirect_comparisons <- function(pop_init,
   # trial_AC <- pop_init[selected_outcomes_AC, on = "id"][, ttt := factor(ttt, levels = c("C", "A"))]
   selected_individuals_AC_A <- pop_init[trial.f == "AC" & trt.f == "A"][sample(1:.N, N_RCT/2, replace = FALSE)]
   selected_individuals_AC_C <- pop_init[trial.f == "AC" & trt.f == "A"][sample(1:.N, N_RCT/2, replace = FALSE)]
-  trial_AC <- rbindlist(list(selected_individuals_AC_A, selected_individuals_AC_C))[, .(id, X1, X2, ttt = trt.f, Y_obs = Y)]
-  
+  trial_AC <- rbindlist(list(selected_individuals_AC_A, selected_individuals_AC_C), use.names = TRUE)[, .(id, X1, X2, ttt = trt.f, Y_obs = Y)]
+
   # selected_individuals_BC <- pop_init[sample(id, N_RCT, replace = FALSE, prob = prob_w_trial_BC)][
   #   , ttt := rep_len(c("B", "C"), length.out = .N)]
   # selected_outcomes_BC <- df_outcomes[selected_individuals_BC, on = c("id", "ttt")][
@@ -142,20 +142,20 @@ indirect_comparisons <- function(pop_init,
   # trial_BC <- pop_init[selected_outcomes_BC, on = "id"][, ttt := factor(ttt, levels = c("C", "B"))]
   selected_individuals_BC_B <- pop_init[trial.f == "BC" & trt.f == "B"][sample(1:.N, N_RCT/2, replace = FALSE)]
   selected_individuals_BC_C <- pop_init[trial.f == "BC" & trt.f == "C"][sample(1:.N, N_RCT/2, replace = FALSE)]
-  trial_BC <- rbindlist(list(selected_individuals_BC_B, selected_individuals_BC_C))[, .(id, X1, X2, ttt = trt.f, Y_obs = Y)]
-  
+  trial_BC <- rbindlist(list(selected_individuals_BC_B, selected_individuals_BC_C), use.names = TRUE)[, .(id, X1, X2, ttt = trt.f, Y_obs = Y)]
+
   is_anchored <- FALSE
-  
-  ps_w <- propensity_score(trial_AC, 
-                           trial_BC, 
-                           covariate_names, 
+
+  ps_w <- propensity_score(trial_AC,
+                           trial_BC,
+                           covariate_names,
                            anchored = is_anchored,
                            weight_estimation_method = "max_likelihood",
                            outcome_family = gaussian(link = "identity"),
                            studying_populations = TRUE)
-  maic_w <- propensity_score(trial_AC, 
-                           trial_BC, 
-                           covariate_names, 
+  maic_w <- propensity_score(trial_AC,
+                           trial_BC,
+                           covariate_names,
                            anchored = is_anchored,
                            weight_estimation_method = "moments",
                            outcome_family = gaussian(link = "identity"),
@@ -172,10 +172,10 @@ indirect_comparisons <- function(pop_init,
 # draw_trials <- function(pop_init, N_RCT) {
 #   selected_individuals_AC <- pop_init[sample(id, N_RCT, replace = TRUE, prob = prob_w_trial_AC)][
 #     , ttt := rep_len(c("A", "C"), length.out = .N)]
-# 
+#
 #   selected_individuals_BC <- pop_init[sample(id, N_RCT, replace = TRUE, prob = prob_w_trial_BC)][
 #     , ttt := rep_len(c("B", "C"), length.out = .N)]
-#   return(list(trial_AC = selected_individuals_AC, 
+#   return(list(trial_AC = selected_individuals_AC,
 #               trial_BC = selected_individuals_BC))
 # }
 
@@ -214,11 +214,11 @@ for (n_scenario in n_scenarios) {
   # df_outcomes <- population$df_outcomes
   # pop_init <- population$pop_init
   load(file = paste0("david_10052024/simulated_data_scenario", n_scenario, ".RDS"))
-  pop_init <- data.table::rbindlist(list(dfAC, dfBC))
-  
+  pop_init <- data.table::rbindlist(list(dfAC, dfBC), use.names = TRUE)
+
   pop_init[, .(id, X1, X2, )]
   # df_outcomes <- pop_init[, .(id, Y_obs = Y)]
-  
+
   for (row_estimators in 1:nrow(df_estimators_parameters)) {
     list_estimators_parameters <- df_estimators_parameters[row_estimators, ] |> unlist(recursive = FALSE)
     results_simulations <- parallel::mclapply(1:n_iter, \(i) {
