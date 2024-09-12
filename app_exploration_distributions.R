@@ -3,9 +3,15 @@ library(data.table)
 library(ggplot2)
 source("data_generation.R")
 
+jscode <- '$(document).keyup(function(e) {
+    if (e.key == "Enter") {
+    $("#runSimulation").click();
+}});'
+
 
 # Define UI
 ui <- fluidPage(
+  tags$head(tags$script(HTML(jscode))),
   titlePanel("Covariate Distribution in Trials"),
   sidebarLayout(
     sidebarPanel(
@@ -15,14 +21,20 @@ ui <- fluidPage(
       numericInput("bY_A", "bY_A", value = 1.5),
       numericInput("bY_B", "bY_B", value = 1.5),
       numericInput("bY_C", "bY_C", value = 0),
+      numericInput("fbT", "fbT", value = 1),
+      numericInput("bT", "bT", value = 0.5),
       numericInput("bT_X1", "bT_X1", value = 0),
+      numericInput("bT2_X1", "bT2_X1", value = 0),
       numericInput("bT_X2", "bT_X2", value = 0 ),
+      numericInput("bT2_X2", "bT2_X2", value = 0 ),
       numericInput("bY_X1", "bY_X1", value = 0),
       numericInput("bY_X2", "bY_X2", value = 0),
       numericInput("bY_A_X1", "bY_A_X1", value = 0),
       numericInput("bY_A_X2", "bY_A_X2", value = 0),
-      textInput("f_X1", "f_X1", value = "rnorm(N_pop, 0, 1)", placeholder ="rnorm(N_pop, 0, 1)"),
-      textInput("f_X2", "f_X2", value = "rnorm(N_pop, 0, 1)", placeholder ="rnorm(N_pop, 0, 1)"),
+      textInput("f_X1", "f_X1", value = "rnorm(N_pop, 0, 1)", placeholder = "rnorm(N_pop, 0, 1)"),
+      textInput("f_X2", "f_X2", value = "rnorm(N_pop, 0, 1)", placeholder = "rnorm(N_pop, 0, 1)"),
+      textInput("f_X3", "f_X3: not used", value = "0", placeholder = ""),
+      textInput("f_X4", "f_X4: not used", value = "0", placeholder = ""),
       actionButton("runSimulation", "Run Simulation")
     ),
     mainPanel(
@@ -41,34 +53,39 @@ server <- function(input, output) {
   theme_set(theme_bw())
   theme_update(text = element_text(size = 20))
 
+
   bindEvent(input$runSimulation,
             x = observe({
-              N_RCT <- 5*10^4 # Example value, adjust based on your simulation setup
+              N_RCT <- 5*10^4
               N_pop <- 5*10^5
               print(N_pop)
               print(N_RCT)
               list_simulation_parameters <- list(
                 N_pop = 10^5,
                 N_RCT = 10000,
+                fbT = input$fbT,
+                bT = input$bT,
                 bT_X1 = input$bT_X1,   # Effet de la variable sur la probabilité d'être dans l'essai BC
+                bT2_X1 = input$bT2_X1,   # Effet de la variable sur la probabilité d'être dans l'essai BC
                 bT_X2 = input$bT_X2,   # Effet de la variable continue X2...
+                bT2_X2 = input$bT2_X2,   # Effet de la variable continue X2...
                 bY_X1 = input$bY_X1,   # Effet de X1 sur l'outcome
                 bY_X2 = input$bY_X2,   # Effet de X2 sur l'outcome
                 bY_A_X1 = input$bY_A_X1, # Interaction A et X1 dans le modèle outcome
                 bY_A_X2 = input$bY_A_X2, # Interaction A et X2 dans le modèle outcome
-                binary_marker = bquote(rbinom(N_pop, 1, 0.5)), # Utilisé pour la variable bimodale
                 f_X1 = parse(text = input$f_X1),
                 f_X2 = parse(text = input$f_X2), # distribution de X2
+                f_X3 = parse(text = input$f_X3), # distribution de X3
+                f_X4 = parse(text = input$f_X4), # distribution de X4
                 bY_A = input$bY_A,  # Effet de A par rapport à C
                 bY_B = input$bY_B,  # Effet de B par rapport à C
                 bY_C = input$bY_C,    # Pas d'effet de C sur l'outcome
-                BC_trial_model = bquote(X1 * bT_X1 + X2 * bT_X2 ),
+                BC_trial_model = bquote(bT + bT_X1 * X1 + bT2_X1 * X1^3 + bT_X2 * X2 + bT2_X2 * X2^3),
                 outcome_distribution = input$outcome_distribution,
                 outcome_generation_formula =  bquote(
                   bY_X1*X1 + bY_X2 * X2 +  (bY_A + bY_A_X1*X1 + bY_A_X2*X2) * A +  bY_B*B + bY_C*C
                 )
               )
-
               populations <- creating_population(list_simulation_parameters)
               pop_init <- populations$pop_init
 

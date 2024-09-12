@@ -7,8 +7,8 @@ source("data_generation.R")
 # Parameters
 ####################
 N_pop <- 10^6
-N_BOOT_ITER <- 200
-n_iter <- 500
+N_BOOT_ITER <- 3
+n_iter <- 3
 
 ###############
 ### SIMULATIONS
@@ -56,3 +56,6 @@ cat("Simulation length: ")
 print(Sys.time() - time_start)
 print(time_start_string)
 write(paste0("DATE_EXPERIMENT <- '", time_start_string, "'"), file = "env_variables.R", append = FALSE)
+source("processing_results.R")
+source("graph_distribution_covariates.R")
+zip("results.zip", files = file.path("results_simulations", c(time_start_string, "logs.txt")))
