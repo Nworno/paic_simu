@@ -44,7 +44,7 @@ df_default_parameters <- list(
   ))
 )
 
-# Taking all the combination of the list of parameters
+# Taking all the combination of the list
 # |>
 #   expand.grid(stringsAsFactors = FALSE) |>
 #   as.data.table()
@@ -317,25 +317,46 @@ indirect_comparisons <- function(pop_init,
                                                             studying_populations = FALSE,
                                                             outcome_family = glm_family)
 
-  #########
-  ### MAIC
-  #########
-  struct_results$iptw$anchored$maic <- run_propensity_score(trial_AC,
+  ##################
+  ### MAIC Moments 1
+  ##################
+  struct_results$iptw$anchored$maic_1 <- run_propensity_score(trial_AC,
                                                             trial_BC,
                                                             covariate_names,
                                                             assignment_model,
                                                             anchored = TRUE,
-                                                            weight_estimation_method = "moments",
+                                                            weight_estimation_method = "moments_1",
                                                             outcome_family = glm_family,
                                                             studying_populations = FALSE)
-  struct_results$iptw$unanchored$maic <- run_propensity_score(trial_AC,
+  struct_results$iptw$unanchored$maic_1 <- run_propensity_score(trial_AC,
                                                               trial_BC,
                                                               covariate_names,
                                                               anchored = FALSE,
                                                               assignment_model,
-                                                              weight_estimation_method = "moments",
+                                                              weight_estimation_method = "moments_1",
                                                               outcome_family = glm_family,
                                                               studying_populations = FALSE)
+
+  ##################
+  ### MAIC Moments 1
+  ##################
+  struct_results$iptw$anchored$maic_2 <- run_propensity_score(trial_AC,
+                                                            trial_BC,
+                                                            covariate_names,
+                                                            assignment_model,
+                                                            anchored = TRUE,
+                                                            weight_estimation_method = "moments_2",
+                                                            outcome_family = glm_family,
+                                                            studying_populations = FALSE)
+  struct_results$iptw$unanchored$maic_2 <- run_propensity_score(trial_AC,
+                                                              trial_BC,
+                                                              covariate_names,
+                                                              anchored = FALSE,
+                                                              assignment_model,
+                                                              weight_estimation_method = "moments_2",
+                                                              outcome_family = glm_family,
+                                                              studying_populations = FALSE)
+
 
   ##########
   ###### STC
@@ -381,8 +402,8 @@ struct_results <- list(
     unanchored = list(glm = NULL, stc = NULL)
   ),
   iptw = list(
-    anchored = list(ml = NULL, maic = NULL),
-    unanchored = list(ml = NULL, maic = NULL)
+    anchored = list(ml = NULL, maic_1 = NULL, maic_2 = NULL),
+    unanchored = list(ml = NULL, maic = NULL, maic_2 = NULL)
   )
 )
 

@@ -60,8 +60,15 @@ mm_obj_fun <- function(params, X) {
 mm_grad_fun <- function(params, X) {
   colSums(sweep(X, 1, exp(X %*% params), FUN = "*"))
 }
-mm <- function(df, mean_covariates) {
-  centered_IPD <- sweep(df, 2, mean_covariates, "-")
+mm <- function(df, mean_covariates, moments_2, var_covariates = NULL) {
+  centered_mean <- sweep(df, 2, mean_covariates, "-")
+
+  if (moments_2) {
+    centered_IPD2 <- sweep(df^2, 2, mean_covariates ^ 2 + var_covariates, FUN = "-")
+    centered_IPD <- cbind(centered_mean, centered_IPD2) |> data.matrix()
+  } else {
+    centered_IPD <- centered_mean
+  }
   random_init <- rep(0, ncol(centered_IPD))
 
   params <- optim(random_init, fn = mm_obj_fun, gr = mm_grad_fun, method = "BFGS", X = centered_IPD)$par
@@ -74,7 +81,7 @@ propensity_score <- function(trial_AC,
                              covariate_names,
                              assignment_model,
                              anchored,
-                             weight_estimation_method = c("max_likelihood", "moments"),
+                             weight_estimation_method = c("max_likelihood", "moments_1", "moments_2"),
                              outcome_family,
                              studying_populations = FALSE) {
   if (anchored) {
@@ -89,10 +96,18 @@ propensity_score <- function(trial_AC,
       trial_assignment_model <- paste0("trial ~ ", assignment_model)
       PS_BC_trial <- glm(trial_assignment_model, df, family = binomial(link = "logit"))$fitted.values
       trial_weights <- (df[["trial"]] == "BC") + (df[["trial"]] == "AC") * PS_BC_trial / (1 - PS_BC_trial)
-    } else if (weight_estimation_method == "moments") {
+    } else if (weight_estimation_method == "moments_1") {
       ##### MAIC weights
       trial_weights <- mm(data.matrix(trial_AC[, covariate_names, with = FALSE]),
-                       colMeans(trial_BC[, covariate_names, with = FALSE])) |>
+                       colMeans(trial_BC[, covariate_names, with = FALSE]),
+                       moments_2 = FALSE) |>
+        c(rep(1, nrow(trial_BC)))
+    } else if (weight_estimation_method == "moments_2") {
+      trial_weights <- mm(data.matrix(trial_AC[, covariate_names, with = FALSE]),
+                          colMeans(trial_BC[, covariate_names, with = FALSE]),
+                          moments_2 = TRUE,
+                          var_covariates = trial_BC[, lapply(.SD, var), .SDcols = covariate_names] |> data.matrix()
+      ) |>
         c(rep(1, nrow(trial_BC)))
     } else {
       stop("No weight estimation method provided")
@@ -118,10 +133,18 @@ propensity_score <- function(trial_AC,
       ttt_assignment_model <- paste0("ttt ~ ", assignment_model)
       PS_B_ttt <- glm(ttt_assignment_model, df, family = binomial(link = "logit"))$fitted.values
       trial_weights <- (PS_B_ttt / (1 - PS_B_ttt)) * (df[["ttt"]] == "A") + (df[["ttt"]] == "B")
-    } else if (weight_estimation_method == "moments") {
+    } else if (weight_estimation_method == "moments_1") {
       ##### MAIC weights
       trial_weights <- mm(data.matrix(trial_A[, covariate_names, with = FALSE]),
-                      colMeans(trial_B[, covariate_names, with = FALSE])) |>
+                          colMeans(trial_B[, covariate_names, with = FALSE]),
+                          moments_2 = FALSE) |>
+        c(rep(1, nrow(trial_B)))
+    } else if (weight_estimation_method == "moments_2") {
+      trial_weights <- mm(data.matrix(trial_A[, covariate_names, with = FALSE]),
+                          colMeans(trial_B[, covariate_names, with = FALSE]),
+                          moments_2 = TRUE,
+                          var_covariates = trial_B[, lapply(.SD, var), .SDcols = covariate_names] |> data.matrix()
+      ) |>
         c(rep(1, nrow(trial_B)))
     } else {
       stop("No weighting method provided")
@@ -195,7 +218,7 @@ run_propensity_score <- function(trial_AC, trial_BC, covariate_names, assignment
   #                                                           studying_populations)$variance_AC)
   # mean_variance_AC <- Filter(is.numeric, boot_estimates_var_AC) |> unlist() |> mean()
 
-  variance_AB <- variance_BC + variance_AC
+  variance_AB <- variance_BC + variance_AC # works only on a linear scale, so estimate output has to remain linear
 
   return(list("estimate" = estimate_AB, "variance" = variance_AB))
 }
