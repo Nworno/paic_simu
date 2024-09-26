@@ -263,7 +263,8 @@ indirect_comparisons <- function(pop_init,
                                  outcome_regression_model,
                                  covariate_names,
                                  assignment_model,
-                                 outcome_distribution) {
+                                 outcome_distribution,
+                                 retrieve_ps_weights = FALSE) {
 
   #############################
   ############## Drawing trials
@@ -318,7 +319,7 @@ indirect_comparisons <- function(pop_init,
                                                           assignment_model,
                                                           anchored = TRUE,
                                                           weight_estimation_method = "max_likelihood",
-                                                          studying_populations = FALSE,
+                                                          retrieve_ps_weights = retrieve_ps_weights,
                                                           outcome_family = glm_family)
   struct_results$iptw$unanchored$ml <- run_propensity_score(trial_AC,
                                                             trial_BC,
@@ -326,7 +327,7 @@ indirect_comparisons <- function(pop_init,
                                                             assignment_model,
                                                             anchored = FALSE,
                                                             weight_estimation_method = "max_likelihood",
-                                                            studying_populations = FALSE,
+                                                            retrieve_ps_weights = retrieve_ps_weights,
                                                             outcome_family = glm_family)
 
   ##################
@@ -339,7 +340,7 @@ indirect_comparisons <- function(pop_init,
                                                             anchored = TRUE,
                                                             weight_estimation_method = "moments_1",
                                                             outcome_family = glm_family,
-                                                            studying_populations = FALSE)
+                                                            retrieve_ps_weights = retrieve_ps_weights)
   struct_results$iptw$unanchored$maic_1 <- run_propensity_score(trial_AC,
                                                               trial_BC,
                                                               covariate_names,
@@ -347,7 +348,7 @@ indirect_comparisons <- function(pop_init,
                                                               assignment_model,
                                                               weight_estimation_method = "moments_1",
                                                               outcome_family = glm_family,
-                                                              studying_populations = FALSE)
+                                                              retrieve_ps_weights = retrieve_ps_weights)
 
   ##################
   ### MAIC Moments 1
@@ -359,7 +360,7 @@ indirect_comparisons <- function(pop_init,
                                                             anchored = TRUE,
                                                             weight_estimation_method = "moments_2",
                                                             outcome_family = glm_family,
-                                                            studying_populations = FALSE)
+                                                            retrieve_ps_weights = retrieve_ps_weights)
   struct_results$iptw$unanchored$maic_2 <- run_propensity_score(trial_AC,
                                                               trial_BC,
                                                               covariate_names,
@@ -367,7 +368,25 @@ indirect_comparisons <- function(pop_init,
                                                               assignment_model,
                                                               weight_estimation_method = "moments_2",
                                                               outcome_family = glm_family,
-                                                              studying_populations = FALSE)
+                                                              retrieve_ps_weights = retrieve_ps_weights)
+
+
+  if (retrieve_ps_weights) {
+    struct_ps_df <- sapply(struct_results[["iptw"]],
+                           \(sublist) sapply(sublist, \(subsublist) {
+                             subsublist[["df"]]
+                           }, simplify = FALSE, USE.NAMES = TRUE),
+                           simplify = FALSE,
+                           USE.NAMES = TRUE)
+    struct_results[["iptw"]] <- sapply(struct_results[["iptw"]],
+                                       \(sublist) sapply(sublist,
+                                                         \(subsublist) {
+                                                         subsublist[["df"]] <- NULL
+                                                         return(subsublist)
+                                                         }, simplify = FALSE, USE.NAMES = TRUE),
+                                                         simplify = FALSE,
+                                                         USE.NAMES = TRUE)
+  }
 
 
   ##########
@@ -400,7 +419,9 @@ indirect_comparisons <- function(pop_init,
     dplyr::rename(adjustment = name) |>
     tidyr::pivot_wider(names_from = indicator, values_from = value)
 
-  return(rectangle_results)
+  list_results <- list(rectangle_results = rectangle_results)
+  if (retrieve_ps_weights) list_results$struct_ps_df = struct_ps_df
+  return(list_results)
 }
 
 
@@ -415,7 +436,7 @@ struct_results <- list(
   ),
   iptw = list(
     anchored = list(ml = NULL, maic_1 = NULL, maic_2 = NULL),
-    unanchored = list(ml = NULL, maic = NULL, maic_2 = NULL)
+    unanchored = list(ml = NULL, maic_1 = NULL, maic_2 = NULL)
   )
 )
 

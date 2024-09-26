@@ -82,8 +82,7 @@ propensity_score <- function(trial_AC,
                              assignment_model,
                              anchored,
                              weight_estimation_method = c("max_likelihood", "moments_1", "moments_2"),
-                             outcome_family,
-                             studying_populations = FALSE) {
+                             outcome_family) {
   if (anchored) {
     ######### Anchored
     df <- data.table::rbindlist(list("AC" = trial_AC, "BC" = trial_BC), idcol = "trial", fill = TRUE, use.names = TRUE)
@@ -111,9 +110,6 @@ propensity_score <- function(trial_AC,
         c(rep(1, nrow(trial_BC)))
     } else {
       stop("No weight estimation method provided")
-    }
-    if (studying_populations) {
-      return(trial_weights)
     }
     if (outcome_family$family == "binomial") {
       df$y_0 <- 1 - df$Y_obs
@@ -149,9 +145,6 @@ propensity_score <- function(trial_AC,
     } else {
       stop("No weighting method provided")
     }
-    if (studying_populations) {
-      return(trial_weights)
-    }
     df[, ttt := relevel(as.factor(ttt), ref = "B")]
     stopifnot(levels(df$ttt)[[1]] == "B")
     if (outcome_family$family == "binomial") {
@@ -181,18 +174,18 @@ propensity_score <- function(trial_AC,
   estimate_A_and_C <- df[trial == "AC"][, .(mean = weighted.mean(Y_obs, trial_weights)), by = ttt]
   if (anchored) estimate_AC <- estimate_A_and_C[ttt == "A", mean] - estimate_A_and_C[ttt == "C", mean] else estimate_AC <- estimate_A_and_C[ttt == "A", mean]
 
-  return(list(estimate_AB = estimate_AB, estimate_AC = estimate_AC, variance_AC = variance_AC, variance_BC = variance_BC))
+  return(list(estimate_AB = estimate_AB, estimate_AC = estimate_AC, variance_AC = variance_AC, variance_BC = variance_BC,
+              df = df))
 }
 
-run_propensity_score <- function(trial_AC, trial_BC, covariate_names, assignment_model, anchored, weight_estimation_method, outcome_family, studying_populations = FALSE) {
+run_propensity_score <- function(trial_AC, trial_BC, covariate_names, assignment_model, anchored, weight_estimation_method, outcome_family, retrieve_ps_weights) {
   results <- propensity_score(trial_AC,
                               trial_BC,
                               covariate_names,
                               assignment_model,
                               anchored,
                               weight_estimation_method,
-                              outcome_family,
-                              studying_populations)
+                              outcome_family)
   estimate_AB <- results$estimate_AB
   variance_BC <- results$variance_BC
   # variance_AC <- results$variance_AC
@@ -202,8 +195,7 @@ run_propensity_score <- function(trial_AC, trial_BC, covariate_names, assignment
                                                            assignment_model,
                                                            anchored,
                                                            weight_estimation_method,
-                                                           outcome_family,
-                                                           studying_populations)$estimate_AC)
+                                                           outcome_family)$estimate_AC)
 
   variance_AC <- Filter(is.numeric, boot_estimates_AC) |> unlist() |> var()
 
@@ -219,8 +211,9 @@ run_propensity_score <- function(trial_AC, trial_BC, covariate_names, assignment
   # mean_variance_AC <- Filter(is.numeric, boot_estimates_var_AC) |> unlist() |> mean()
 
   variance_AB <- variance_BC + variance_AC # works only on a linear scale, so estimate output has to remain linear
-
-  return(list("estimate" = estimate_AB, "variance" = variance_AB))
+  list_ps_results <- list("estimate" = estimate_AB, "variance" = variance_AB)
+  if (retrieve_ps_weights) list_ps_results$df <- results$df
+  return(list_ps_results)
 }
 
 ############################

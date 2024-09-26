@@ -32,6 +32,7 @@ for (row_population in 1:nrow(df_population_parameters)) {
   # Commented because huge file, so would take could much space if saved for every try
   # saveRDS(pop_init, file.path(dir_sub_experiment, "pop_init.RDS"))
 
+  retrieve_ps_weights <- TRUE
   for (row_estimators in 1:nrow(df_estimators_parameters)) {
     list_estimators_parameters <- df_estimators_parameters[row_estimators, ] |> unlist(recursive = FALSE)
     results_simulations <- parallel::mclapply(1:n_iter, \(i) {
@@ -43,13 +44,20 @@ for (row_population in 1:nrow(df_population_parameters)) {
                                                          list_estimators_parameters[["outcome_regression_model"]],
                                                          list_estimators_parameters[["covariate_names"]],
                                                          list_estimators_parameters[["assignment_model"]],
-                                                         list_simulation_parameters[["outcome_distribution"]])
+                                                         list_simulation_parameters[["outcome_distribution"]],
+                                                         retrieve_ps_weights = retrieve_ps_weights)
       time_eluded <- Sys.time() - time_start_iteration
       cat("Experiment ", row_population, ".", row_estimators, ", Iteration ", i, ", length: ", time_eluded, " seconds\n", sep = "")
       return(result_indirect_comparison)
     })
-    saveRDS(results_simulations, file = file.path(dir_sub_experiment,
-                                                  paste0("experiment_", row_estimators, ".RDS")))
+    if (retrieve_ps_weights) {
+      saveRDS(sapply(results_simulations, \(x) x$struct_ps_df, USE.NAMES = TRUE, simplify = FALSE),
+              file = file.path(dir_sub_experiment,
+                               paste0("experiment_dfs_", row_estimators, ".RDS")))
+    }
+    saveRDS(sapply(results_simulations, \(x) x$rectangle_results, USE.NAMES = TRUE, simplify = FALSE),
+            file = file.path(dir_sub_experiment,
+                             paste0("experiment_results_", row_estimators, ".RDS")))
   }
 }
 cat("Simulation length: ")

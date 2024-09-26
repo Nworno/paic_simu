@@ -7,7 +7,7 @@ source("env_variables.R")
 dir_experience_results <- file.path("results_simulations", DATE_EXPERIMENT)
 
 list_files <- lapply(list.dirs(dir_experience_results, full.names = TRUE), \(x) {
-  list.files(x, full.names = TRUE, pattern = "^experiment.*\\.RDS")
+  list.files(x, full.names = TRUE, pattern = "^experiment_results.*\\.RDS")
 }) |> Filter(f = \(x) length(x) != 0)
 nested_list_results_df <- rapply(list_files, classes = "character", how = "replace", \(x) {
   sapply(x, readRDS, simplify = FALSE)
