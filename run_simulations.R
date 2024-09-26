@@ -7,8 +7,8 @@ source("data_generation.R")
 # Parameters
 ####################
 N_pop <- 10^6
-N_BOOT_ITER <- 300
-n_iter <- 300
+N_BOOT_ITER <- 3
+n_iter <- 2
 
 ###############
 ### SIMULATIONS

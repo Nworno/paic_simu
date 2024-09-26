@@ -35,6 +35,7 @@ ui <- fluidPage(
       textInput("f_X2", "f_X2", value = "rnorm(N_pop, 0, 1)", placeholder = "rnorm(N_pop, 0, 1)"),
       textInput("f_X3", "f_X3: not used", value = "0", placeholder = ""),
       textInput("f_X4", "f_X4: not used", value = "0", placeholder = ""),
+      textInput("BC_trial_model", "BC trial model", value = "bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2"),
       actionButton("runSimulation", "Run Simulation")
     ),
     mainPanel(
@@ -80,8 +81,8 @@ server <- function(input, output) {
                 bY_A = input$bY_A,  # Effet de A par rapport à C
                 bY_B = input$bY_B,  # Effet de B par rapport à C
                 bY_C = input$bY_C,    # Pas d'effet de C sur l'outcome
-                BC_trial_model = bquote(bT + bT_X1 * X1 + bT2_X1 * X1^3 + bT_X2 * X2 + bT2_X2 * X2^3),
-                outcome_distribution = input$outcome_distribution,
+                BC_trial_model = parse(text = input$BC_trial_model),
+                outcome_distribution = parse(text = input$outcome_distribution),
                 outcome_generation_formula =  bquote(
                   bY_X1*X1 + bY_X2 * X2 +  (bY_A + bY_A_X1*X1 + bY_A_X2*X2) * A +  bY_B*B + bY_C*C
                 )
