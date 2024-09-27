@@ -7,6 +7,7 @@ theme_update(panel.background = element_blank())
 ## Drawing distributions covariates
 ###################################
 library(data.table)
+library(patchwork)
 source("env_variables.R")
 source("data_generation.R")
 
@@ -15,8 +16,6 @@ source("data_generation.R")
 ##################################
 
 N_pop <- 10^5
-# path_experiment <- file.path("results_simulations", "test")
-# if (!dir.exists(path_experiment)) dir.create(path_experiment)
 path_experiment <- file.path("results_simulations", DATE_EXPERIMENT)
 df_population_parameters <- readRDS(file.path(path_experiment, "df_population_parameters.RDS"))
 
@@ -107,6 +106,51 @@ for (num_population in df_population_parameters$population_parameters_num) {
   ggsave(file.path(path_results_experiments, "outcomes_distribution.png"),
          plot = plot_outcome_distribution, width = 10, height = 5)
 }
+
+plot_weighting <- function(df) {
+
+  # weird quirk, to remove the second occurence of the trial column
+  names_to_retain <- c(which(names(df) == "trial")[1],
+                       which(names(df) != "trial"))
+  plot_non_weighted <- df[, ..names_to_retain] |>
+    dplyr::select(-X3, -X4) |>
+    tidyr::pivot_longer(cols = c("X1", "X2"), names_to = "variable", values_to = "values") |>
+    ggplot() +
+    geom_density(aes(values, fill = trial), alpha = 0.5) +
+    facet_wrap(facets = "variable") +
+    labs(title = "non-weighted")
+
+  plot_weighted <- df[, ..names_to_retain] |>
+    dplyr::select(-X3, -X4) |>
+    tidyr::pivot_longer(cols = c("X1", "X2"), names_to = "variable", values_to = "values") |>
+    ggplot() +
+    geom_density(aes(values, fill = trial, weight = trial_weights), alpha = 0.5) +
+    facet_wrap(facets = "variable") +
+    labs(title = "weighted")
+  return(plot_non_weighted + plot_weighted)
+}
+for (num_population in df_population_parameters$population_parameters_num) {
+  for (num_estimator in df_estimators_parameters$estimator_num) {
+    list_dfs <- readRDS(file.path(path_experiment, num_population, paste0("experiment_dfs_", num_estimator, ".RDS")))
+    sample_list_dfs <- list_dfs[sample(1:length(list_dfs), min(length(list_dfs), 5), replace = FALSE)]
+
+    list_weighting_plots <- sapply(sample_list_dfs,
+                         \(iteration) sapply(iteration,
+                                             \(sublist) sapply(sublist,
+                                                               \(df) plot_weighting(df),
+                                                               USE.NAMES = TRUE,
+                                                               simplify = FALSE),
+                                             USE.NAMES = TRUE,
+                                             simplify = FALSE),
+                         USE.NAMES = TRUE,
+                         simplify = FALSE)
+    saveRDS(list_weighting_plots, file = file.path(file.path(path_experiment, num_population, paste0("sample_weighting_plots", num_estimator, ".RDS"))))
+    # list_plots <- rapply(sample_list_dfs, plot_weighting, classes = c("data.frame", "data.table"), how = "replace")
+
+  }
+}
+
+
 
 
 #### Graph distributions weighting

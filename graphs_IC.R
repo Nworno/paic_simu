@@ -12,10 +12,10 @@ df_population_parameters <- readRDS(file.path(dir_experiment, "df_population_par
 estimator_num <- "3"
 num_experiment <- "1"
 path_experiment <- file.path(file.path(dir_experiment, num_experiment))
-results_experiment <- readRDS(file.path(path_experiment, paste0("experiment_", estimator_num, ".RDS")))
+results_experiment <- readRDS(file.path(path_experiment, paste0("experiment_results_", estimator_num, ".RDS")))
 true_results <- readRDS(file.path(path_experiment, "average_outcome_df.RDS"))
 
-true_effect <- true_results[outcome_type == "conditional", AB]
+true_effect <- true_results[trial == "BC" & outcome_type == "conditional", AB]
 
 data_long <- results_experiment |>
   rbindlist(use.names = TRUE) |>
@@ -43,8 +43,8 @@ data_long <- results_experiment |>
 
 data_long  |>
   ggplot() +
-  geom_rect(aes(xmin = -Inf, xmax = true_effect, ymin = true_effect, ymax = Inf), fill = "#A0D2AD", alpha = 0.02) +
-  geom_rect(aes(xmin = -Inf, xmax = 0, ymin = 0, ymax = Inf), fill = "grey", alpha = 0.01) +
+  annotate(geom = "rect", xmin = -Inf, xmax = true_effect, ymin = true_effect, ymax = Inf, fill = "#A0D2AD", alpha = 0.3) +
+  annotate(geom = "rect", xmin = -Inf, xmax = 0, ymin = 0, ymax = Inf, fill = "grey", alpha = 0.2) +
   geom_point(aes(x = lb, y = ub, color = anchored), alpha = 0.5) +
   geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "black") +
   facet_wrap(~adjustment + model)

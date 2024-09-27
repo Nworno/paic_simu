@@ -294,6 +294,7 @@ indirect_comparisons <- function(pop_init,
   ########## REGRESSION BASED OUTCOME MODEL (both treatment IPD)
   ##############################################################
 
+  print("entering regression models")
   struct_results$regression$anchored$glm <- run_regression_model(trial_AC,
                                                                  trial_BC,
                                                                  outcome_regression_model,
@@ -312,6 +313,7 @@ indirect_comparisons <- function(pop_init,
   #################################################
   ########### PROPENSITY SCORE (both treatment IPD)
   #################################################
+  print("entering PS models")
 
   struct_results$iptw$anchored$ml <- run_propensity_score(trial_AC,
                                                           trial_BC,
@@ -372,6 +374,7 @@ indirect_comparisons <- function(pop_init,
 
 
   if (retrieve_ps_weights) {
+    print("retrieving ps weights")
     struct_ps_df <- sapply(struct_results[["iptw"]],
                            \(sublist) sapply(sublist, \(subsublist) {
                              subsublist[["df"]]
@@ -392,6 +395,7 @@ indirect_comparisons <- function(pop_init,
   ##########
   ###### STC
   ##########
+    print("entering stc")
   struct_results$regression$anchored$stc <- run_regression_model(trial_AC,
                                                                  trial_BC,
                                                                  outcome_regression_model,
@@ -412,6 +416,7 @@ indirect_comparisons <- function(pop_init,
   ############ COMPILING RESULTS
   ##############################
 
+    print("compiling results")
   rectangle_results <- struct_results |> tibble::enframe() |>
     tidyr::unnest_longer(value, indices_to = "anchored") |>
     tidyr::unnest_longer(value, indices_to = "model") |>

@@ -8,7 +8,7 @@ source("data_generation.R")
 ####################
 N_pop <- 10^6
 N_BOOT_ITER <- 3
-n_iter <- 2
+n_iter <- 6
 
 ###############
 ### SIMULATIONS
@@ -66,4 +66,20 @@ print(time_start_string)
 write(paste0("DATE_EXPERIMENT <- '", time_start_string, "'"), file = "env_variables.R", append = FALSE)
 source("processing_results.R")
 source("graph_distribution_covariates.R")
-zip("results.zip", files = file.path("results_simulations", c(time_start_string, "logs.txt")))
+weighting_plots_files <- list.files(file.path("results_simulations", time_start_string),
+                                    pattern = c("weighting"),
+                                    recursive = TRUE,
+                                    full.names = TRUE)
+processed_results_files <- list.files(file.path("results_simulations", time_start_string, "processed_results"),
+                                      recursive = TRUE,
+                                      full.names = TRUE)
+parameters_files <- list.files(file.path("results_simulations", time_start_string),
+                               pattern = "parameters",
+                               recursive = FALSE,
+                               full.names = TRUE)
+pngs <- list.files(file.path("results_simulations", time_start_string),
+                   pattern = "\\.png",
+                   recursive = TRUE,
+                   full.names = TRUE)
+logs <- file.path(file.path("results_simulations", time_start_string, "logs.txt"))
+zip("results.zip", files = c(processed_results_files, weighting_plots_files, parameters_files, pngs))

@@ -19,7 +19,7 @@ long_df_results <- lapply(nested_list_results_df, \(l) {
   }) |>
   lapply(rbindlist, idcol = "estimator_num", use.names = TRUE) |>
   rbindlist(idcol = "population_parameters_num", use.names = TRUE)
-long_df_results[, estimator_num := gsub(pattern = ".*(?<=experiment_)(\\d+)(?=\\.RDS).*", replacement = "\\1", x = estimator_num, perl = TRUE)]
+long_df_results[, estimator_num := gsub(pattern = ".*(?<=experiment_results_)(\\d+)(?=\\.RDS).*", replacement = "\\1", x = estimator_num, perl = TRUE)]
 
 
 df_true_effects <- list.dirs(dir_experience_results) |>
@@ -152,7 +152,7 @@ nonnormal_distribution <- df_population_parameters |>
   select(c(population_parameters_num, matches("f_X"))) |>
   # TODO: pattern à mettre à jour pour récupérer toutes les façons de créer
   # des variables distribuées non normalement
-  mutate(across(matches("f_X"), \(x) grepl("binary_marker", x))) |>
+  mutate(across(matches("f_X"), \(x) grepl("sample", x))) |>
   rowwise() |>
   mutate(any_nonnormal = any(c_across(f_X1:f_X4)),
          nonnormal_distribution = list(c("f_X1", "f_X2", "f_X3", "f_X4")[c(f_X1, f_X2, f_X3, f_X4)]))
@@ -160,7 +160,7 @@ nonnormal_distribution <- df_population_parameters |>
 
 long_df_results <- long_df_results |>
   mutate(data = case_match(model,
-                           c("maic", "stc") ~ "PAIC",
+                           c("maic_1", "maic_2", "stc") ~ "PAIC",
                            c("ml", "glm") ~ "IPD",
                            "unadjusted" ~ "AgD") |> factor(levels = c("AgD", "PAIC", "IPD")),
          outcome_type = case_match(adjustment,
@@ -194,6 +194,7 @@ get_VR <- function(obs, se_obs) {
   mean(se_obs, na.rm = FALSE) / sd(obs, na.rm = FALSE)
 }
 get_cov_95 <- function(coef, se, theo) {
+  browser()
   ub <- coef + qnorm(0.975)*se
   lb <- coef - qnorm(0.975)*se
   covered <- theo < ub & theo > lb
@@ -212,6 +213,7 @@ correct_decision <- function(coef, se, theo) {
 
 df_stats <- joined_results |>
   group_by(Population_parameters_num, Estimator_num, Adjustment, Model, Anchored, Data) |>
+  dplyr::group_walk(\(x, y) browser())
   summarize(bias = get_bias(Estimate, True_effect ),
             rmse = get_RMSE(Estimate, True_effect ),
             vr = get_VR(Estimate, sqrt(Variance)),
