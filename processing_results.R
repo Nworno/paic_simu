@@ -194,7 +194,6 @@ get_VR <- function(obs, se_obs) {
   mean(se_obs, na.rm = FALSE) / sd(obs, na.rm = FALSE)
 }
 get_cov_95 <- function(coef, se, theo) {
-  browser()
   ub <- coef + qnorm(0.975)*se
   lb <- coef - qnorm(0.975)*se
   covered <- theo < ub & theo > lb
@@ -213,7 +212,6 @@ correct_decision <- function(coef, se, theo) {
 
 df_stats <- joined_results |>
   group_by(Population_parameters_num, Estimator_num, Adjustment, Model, Anchored, Data) |>
-  dplyr::group_walk(\(x, y) browser())
   summarize(bias = get_bias(Estimate, True_effect ),
             rmse = get_RMSE(Estimate, True_effect ),
             vr = get_VR(Estimate, sqrt(Variance)),
