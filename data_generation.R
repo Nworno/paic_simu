@@ -6,7 +6,6 @@ library(data.table)
 
 df_default_parameters <- list(
   N_RCT  = c(500),
-  prop_X1 = 0.5, # Variable binaire, prevalence dans la population
   bT = 0.5,
   bT_X1 = 1,   # Effet de la variable binaire sur la probabilité d'être dans l'essai BC
   bT2_X1 = -0.5,   # Effet de la variable binaire sur la probabilité d'être dans l'essai BC
@@ -18,11 +17,11 @@ df_default_parameters <- list(
   bT2_X3 = 0,
   bT2_X4 = 0,
   bY_X1 = 1,   # Effet de X1 sur l'outcome
-  bY_X2 = 1,   # Effet de X2 sur l'outcome
+  bY_X2 = 2,   # Effet de X2 sur l'outcome
   bY_X3 = 0,     # Effet de X3 sur l'outcome
   bY_X4 = 0,     # Effet de X4 sur l'outcome
-  bY_A_X1 = c(1), # Interaction A et X1 dans le modèle outcome
-  bY_A_X2 = c(1), # Interaction A et X2 dans le modèle outcome
+  bY_A_X1 = c(2), # Interaction A et X1 dans le modèle outcome
+  bY_A_X2 = c(0), # Interaction A et X2 dans le modèle outcome
   bY_A_X3 = c(0), # Interaction A et X3 dans le modèle outcome
   bY_A_X4 = c(0), # Interaction A et X4 dans le modèle outcome
   bY_B_X1 = c(0), # Interaction A et X1 dans le modèle outcome
@@ -32,8 +31,8 @@ df_default_parameters <- list(
   # binary_marker = c(bquote(rbinom(N_pop, 1, 0.5))), # Utilisé pour la variable bimodale : introduit corrélation entre les variables, car le marker est le même pour tous les individus
   f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1.5))))),
   f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1.5))))),
-  f_X3 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1.5))))),
-  f_X4 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1.5))))),
+  f_X3 = c(bquote(0)),
+  f_X4 = c(bquote(0)),
   bY_A = 1,  # Effet de A par rapport à C
   bY_B = 1,  # Effet de B par rapport à C
   bY_C = 0,    # Pas d'effet de C sur l'outcome
@@ -76,12 +75,12 @@ list_changing_parameters <- list(
   "3" = list(
     f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
     f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
-    bT = 2,
+    bT = 1,
     bT_X1 = 1,
     bT2_X1 = -1,
     bT_X2 = 1,
     bT2_X2 = -1,
-    fbT = 1,
+    fbT = 0.5,
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
   ),
   "4" = list(
@@ -92,7 +91,7 @@ list_changing_parameters <- list(
     bT2_X1 = -1,
     bT_X2 = 1,
     bT2_X2 = -1,
-    fbT = -1,
+    fbT = -0.5,
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
   ),
   "5" = list(
@@ -280,10 +279,12 @@ indirect_comparisons <- function(pop_init,
   stopifnot(all(levels(trial_AC$ttt)[[1]] == "C",
                 levels(trial_BC$ttt)[[1]] == "C"))
 
+
   glm_family <- switch(outcome_distribution,
                        normal = gaussian(link = "identity"),
                        binomial = binomial(link = "logit"))
 
+  stopifnot(names(trial_AC) == names(trial_BC))
   ###############################
   ########## Unadjusted estimator
   ###############################

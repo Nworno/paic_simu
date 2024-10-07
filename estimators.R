@@ -85,7 +85,7 @@ propensity_score <- function(trial_AC,
                              outcome_family) {
   if (anchored) {
     ######### Anchored
-    df <- data.table::rbindlist(list("AC" = trial_AC, "BC" = trial_BC), idcol = "trial", fill = TRUE, use.names = TRUE)
+    df <- data.table::rbindlist(list(trial_AC, trial_BC), fill = TRUE, use.names = TRUE)
     df[, ttt := relevel(as.factor(ttt), ref = "B")]
     stopifnot(levels(df$ttt)[[1]] == "B")
     if (weight_estimation_method == "max_likelihood") {
@@ -231,8 +231,7 @@ regression_model <- function(trial_AC,
     if (full_ipd) {
       # Classic IPD -->
       ### Classic regression model
-      df_full_ipd <- data.table::rbindlist(list("AC" = trial_AC, "BC" = trial_BC),
-                                           idcol = "trial",
+      df_full_ipd <- data.table::rbindlist(list(trial_AC, trial_BC),
                                            fill = TRUE,
                                            use.names = TRUE)
       if (anchored) {

@@ -107,28 +107,28 @@ for (num_population in df_population_parameters$population_parameters_num) {
          plot = plot_outcome_distribution, width = 10, height = 5)
 }
 
-plot_weighting <- function(df) {
+plot_weighting <- function(df, weight_column = "trial_weights") {
 
   # weird quirk, to remove the second occurence of the trial column
   names_to_retain <- c(which(names(df) == "trial")[1],
                        which(names(df) != "trial"))
-  plot_non_weighted <- df[, ..names_to_retain] |>
-    dplyr::select(-X3, -X4) |>
-    tidyr::pivot_longer(cols = c("X1", "X2"), names_to = "variable", values_to = "values") |>
-    ggplot() +
-    geom_density(aes(values, fill = trial), alpha = 0.5) +
-    facet_wrap(facets = "variable") +
-    labs(title = "non-weighted")
+  # plot_non_weighted <- df[, ..names_to_retain] |>
+  #   dplyr::select(-X3, -X4) |>
+  #   tidyr::pivot_longer(cols = c("X1", "X2"), names_to = "variable", values_to = "values") |>
+  #   ggplot() +
+  #   geom_density(aes(values, fill = trial), alpha = 0.5) +
+  #   facet_wrap(facets = "variable") +
+  #   labs(title = "non-weighted")
 
-  plot_weighted <- df[, ..names_to_retain] |>
+  plot_distribution <- df[, ..names_to_retain] |>
     dplyr::select(-X3, -X4) |>
     tidyr::pivot_longer(cols = c("X1", "X2"), names_to = "variable", values_to = "values") |>
     ggplot() +
-    geom_density(aes(values, fill = trial, weight = trial_weights), alpha = 0.5) +
-    facet_wrap(facets = "variable") +
-    labs(title = "weighted")
-  return(plot_non_weighted + plot_weighted)
+    geom_density(aes_string("values", fill = "trial", weight = weight_column), alpha = 0.5) +
+    facet_wrap(facets = "variable")
+  return(plot_distribution)
 }
+
 for (num_population in df_population_parameters$population_parameters_num) {
   for (num_estimator in df_estimators_parameters$estimator_num) {
     list_dfs <- readRDS(file.path(path_experiment, num_population, paste0("experiment_dfs_", num_estimator, ".RDS")))
@@ -137,7 +137,10 @@ for (num_population in df_population_parameters$population_parameters_num) {
     list_weighting_plots <- sapply(sample_list_dfs,
                          \(iteration) sapply(iteration,
                                              \(sublist) sapply(sublist,
-                                                               \(df) plot_weighting(df),
+                                                               \(df) return(list(
+                                                                 "unweighted" = plot_weighting(df, weight_column = NULL),
+                                                                 "weighted" = plot_weighting(df, weight_column = "trial_weights")
+                                                               )),
                                                                USE.NAMES = TRUE,
                                                                simplify = FALSE),
                                              USE.NAMES = TRUE,
