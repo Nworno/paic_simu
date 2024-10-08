@@ -136,12 +136,14 @@ propensity_score <- function(trial_AC,
                           moments_2 = FALSE) |>
         c(rep(1, nrow(trial_B)))
     } else if (weight_estimation_method == "moments_2") {
+      # print("Oh yeah MAIC moments 2")
       trial_weights <- mm(data.matrix(trial_A[, covariate_names, with = FALSE]),
                           colMeans(trial_B[, covariate_names, with = FALSE]),
                           moments_2 = TRUE,
                           var_covariates = trial_B[, lapply(.SD, var), .SDcols = covariate_names] |> data.matrix()
       ) |>
         c(rep(1, nrow(trial_B)))
+      if (any(is.infinite(trial_weights))) print("ouuuh problem")
     } else {
       stop("No weighting method provided")
     }
@@ -173,7 +175,7 @@ propensity_score <- function(trial_AC,
   # Estimate AC
   estimate_A_and_C <- df[trial == "AC"][, .(mean = weighted.mean(Y_obs, trial_weights)), by = ttt]
   if (anchored) estimate_AC <- estimate_A_and_C[ttt == "A", mean] - estimate_A_and_C[ttt == "C", mean] else estimate_AC <- estimate_A_and_C[ttt == "A", mean]
-
+  if (any(is.na(estimate_AB))) browser()
   return(list(estimate_AB = estimate_AB, estimate_AC = estimate_AC, variance_AC = variance_AC, variance_BC = variance_BC,
               df = df))
 }

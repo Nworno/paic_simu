@@ -13,9 +13,11 @@ nested_list_results_df <- rapply(list_files, classes = "character", how = "repla
   sapply(x, readRDS, simplify = FALSE)
 })
 long_df_results <- lapply(nested_list_results_df, \(l) {
-  l_wo_errors <- lapply(l, \(x) Filter(\(y) !"try-error" %in% class(y), x))
+  # l_wo_errors <- lapply(l, \(x) Filter(\(y) !"try-error" %in% class(y), x))
   # l_wo_errors <- lapply(l, \(x) lapply(x, \(y) Filter(\(z) !"try-error" %in% class(z) | !"character" %in% class(z), y)))
-  lapply(l_wo_errors, rbindlist, idcol = "iteration", use.names = TRUE)
+  # lapply(l_wo_errors, rbindlist, idcol = "iteration", use.names = TRUE)
+  # TODO: a mettre à jour pour attraper les erreurs, quand il y en aura
+  lapply(l, rbindlist, idcol = "iteration", use.names = TRUE)
   }) |>
   lapply(rbindlist, idcol = "estimator_num", use.names = TRUE) |>
   rbindlist(idcol = "population_parameters_num", use.names = TRUE)

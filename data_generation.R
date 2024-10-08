@@ -93,28 +93,28 @@ list_changing_parameters <- list(
     bT2_X2 = -1,
     fbT = -0.5,
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
-  ),
-  "5" = list(
-    f_X1 = c(bquote(rnorm(N_pop, 0, 1))),
-    f_X2 = c(bquote(rnorm(N_pop, 0, 1))),
-    bT = 0.5,
-    bT_X1 = 2,
-    bT2_X1 = -2,
-    bT_X2 = 2,
-    bT2_X2 = -2,
-    fbT = 1,
-    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^3 + bT_X2 * X2 + bT2_X2 * X2^3))
-  ),
-  "6" = list(
-    f_X1 = c(bquote(rnorm(N_pop, 0, 1))),
-    f_X2 = c(bquote(rnorm(N_pop, 0, 1))),
-    bT = 0.5,
-    bT_X1 = 2,
-    bT2_X1 = -2,
-    bT_X2 = 2,
-    bT2_X2 = -2,
-    fbT = -1,
-    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^3 + bT_X2 * X2 + bT2_X2 * X2^3))
+  # ),
+  # "5" = list(
+  #   f_X1 = c(bquote(rnorm(N_pop, 0, 1))),
+  #   f_X2 = c(bquote(rnorm(N_pop, 0, 1))),
+  #   bT = 0.5,
+  #   bT_X1 = 2,
+  #   bT2_X1 = -2,
+  #   bT_X2 = 2,
+  #   bT2_X2 = -2,
+  #   fbT = 1,
+  #   BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^3 + bT_X2 * X2 + bT2_X2 * X2^3))
+  # ),
+  # "6" = list(
+  #   f_X1 = c(bquote(rnorm(N_pop, 0, 1))),
+  #   f_X2 = c(bquote(rnorm(N_pop, 0, 1))),
+  #   bT = 0.5,
+  #   bT_X1 = 2,
+  #   bT2_X1 = -2,
+  #   bT_X2 = 2,
+  #   bT2_X2 = -2,
+  #   fbT = -1,
+  #   BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^3 + bT_X2 * X2 + bT2_X2 * X2^3))
   )
 
 )
@@ -229,7 +229,6 @@ creating_population <- function(list_simulation_parameters) {
     dcast(trial + outcome_type ~ ttt, value.var = "outcome")
   average_outcome_df[, AB := A - B] # linear scale
 
-
   # population_variance <- df_outcomes[, .(var_Y_obs = var(Y_obs)), by = c("ttt")] |>
   #   dcast(. ~ ttt, value.var = "var_Y_obs") |>
   #   dplyr::rename(var_population = `.`) |>
@@ -295,7 +294,6 @@ indirect_comparisons <- function(pop_init,
   ########## REGRESSION BASED OUTCOME MODEL (both treatment IPD)
   ##############################################################
 
-  print("entering regression models")
   struct_results$regression$anchored$glm <- run_regression_model(trial_AC,
                                                                  trial_BC,
                                                                  outcome_regression_model,
@@ -314,7 +312,6 @@ indirect_comparisons <- function(pop_init,
   #################################################
   ########### PROPENSITY SCORE (both treatment IPD)
   #################################################
-  print("entering PS models")
 
   struct_results$iptw$anchored$ml <- run_propensity_score(trial_AC,
                                                           trial_BC,
@@ -396,7 +393,6 @@ indirect_comparisons <- function(pop_init,
   ##########
   ###### STC
   ##########
-    print("entering stc")
   struct_results$regression$anchored$stc <- run_regression_model(trial_AC,
                                                                  trial_BC,
                                                                  outcome_regression_model,
@@ -417,7 +413,6 @@ indirect_comparisons <- function(pop_init,
   ############ COMPILING RESULTS
   ##############################
 
-    print("compiling results")
   rectangle_results <- struct_results |> tibble::enframe() |>
     tidyr::unnest_longer(value, indices_to = "anchored") |>
     tidyr::unnest_longer(value, indices_to = "model") |>
@@ -452,7 +447,7 @@ struct_results <- list(
 
 # Used to specify variables to use for "trial exposure" models, and unanchored STC
 list_covariate_names <- c(
-  combn(c("X1", "X2"), m = 1, simplify = FALSE),
+  # combn(c("X1", "X2"), m = 1, simplify = FALSE),
   combn(c("X1", "X2"), m = 2, simplify = FALSE)
   # combn(c("X1", "X2", "X3", "X4"), m = 3, simplify = FALSE),
   # combn(c("X1", "X2", "X3", "X4"), m = 4, simplify = FALSE)

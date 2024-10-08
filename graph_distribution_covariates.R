@@ -108,23 +108,11 @@ for (num_population in df_population_parameters$population_parameters_num) {
 }
 
 plot_weighting <- function(df, weight_column = "trial_weights") {
-
-  # weird quirk, to remove the second occurence of the trial column
-  names_to_retain <- c(which(names(df) == "trial")[1],
-                       which(names(df) != "trial"))
-  # plot_non_weighted <- df[, ..names_to_retain] |>
-  #   dplyr::select(-X3, -X4) |>
-  #   tidyr::pivot_longer(cols = c("X1", "X2"), names_to = "variable", values_to = "values") |>
-  #   ggplot() +
-  #   geom_density(aes(values, fill = trial), alpha = 0.5) +
-  #   facet_wrap(facets = "variable") +
-  #   labs(title = "non-weighted")
-
-  plot_distribution <- df[, ..names_to_retain] |>
-    dplyr::select(-X3, -X4) |>
+  plot_distribution <- df |>
+    # dplyr::select(-X3, -X4) |>
     tidyr::pivot_longer(cols = c("X1", "X2"), names_to = "variable", values_to = "values") |>
     ggplot() +
-    geom_density(aes_string("values", fill = "trial", weight = weight_column), alpha = 0.5) +
+    geom_density(aes(values, fill = trial, col = trial, weight = {{ weight_column }}), alpha = 0.5) +
     facet_wrap(facets = "variable")
   return(plot_distribution)
 }
@@ -136,20 +124,21 @@ for (num_population in df_population_parameters$population_parameters_num) {
 
     list_weighting_plots <- sapply(sample_list_dfs,
                          \(iteration) sapply(iteration,
-                                             \(sublist) sapply(sublist,
-                                                               \(df) return(list(
-                                                                 "unweighted" = plot_weighting(df, weight_column = NULL),
-                                                                 "weighted" = plot_weighting(df, weight_column = "trial_weights")
-                                                               )),
-                                                               USE.NAMES = TRUE,
-                                                               simplify = FALSE),
+                                             \(sublist) {
+                                               non_weighted <- list(plot_weighting(sublist[[1]], weight_column = NULL))
+                                               weighted <- sapply(sublist,
+                                                                  \(df) plot_weighting(df, weight_column = "trial_weights"),
+                                                                  USE.NAMES = TRUE,
+                                                                  simplify = FALSE)
+                                               c("non_weighted" = non_weighted, weighted)
+                                             },
                                              USE.NAMES = TRUE,
                                              simplify = FALSE),
                          USE.NAMES = TRUE,
                          simplify = FALSE)
-    saveRDS(list_weighting_plots, file = file.path(file.path(path_experiment, num_population, paste0("sample_weighting_plots", num_estimator, ".RDS"))))
+    saveRDS(list_weighting_plots,
+            file = file.path(file.path(path_experiment, num_population, paste0("sample_weighting_plots", num_estimator, ".RDS"))))
     # list_plots <- rapply(sample_list_dfs, plot_weighting, classes = c("data.frame", "data.table"), how = "replace")
-
   }
 }
 
