@@ -447,7 +447,7 @@ struct_results <- list(
 
 # Used to specify variables to use for "trial exposure" models, and unanchored STC
 list_covariate_names <- c(
-  # combn(c("X1", "X2"), m = 1, simplify = FALSE),
+  combn(c("X1", "X2"), m = 1, simplify = FALSE),
   combn(c("X1", "X2"), m = 2, simplify = FALSE)
   # combn(c("X1", "X2", "X3", "X4"), m = 3, simplify = FALSE),
   # combn(c("X1", "X2", "X3", "X4"), m = 4, simplify = FALSE)

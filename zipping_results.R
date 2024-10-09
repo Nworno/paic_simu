@@ -14,6 +14,6 @@ pngs <- list.files(file.path("results_simulations", DATE_EXPERIMENT),
                    pattern = "\\.png",
                    recursive = TRUE,
                    full.names = TRUE)
-logs <- "logs.txt"
+logs <- "results_simulations/logs.txt"
 file.remove("results_simulations/results.zip")
-zip("results_simulations/results.zip", files = c(processed_results_files, weighting_plots_files, parameters_files, pngs))
+zip("results_simulations/results.zip", files = c(processed_results_files, weighting_plots_files, parameters_files, pngs, logs))
