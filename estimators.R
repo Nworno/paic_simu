@@ -175,7 +175,8 @@ propensity_score <- function(trial_AC,
   # Estimate AC
   estimate_A_and_C <- df[trial == "AC"][, .(mean = weighted.mean(Y_obs, trial_weights)), by = ttt]
   if (anchored) estimate_AC <- estimate_A_and_C[ttt == "A", mean] - estimate_A_and_C[ttt == "C", mean] else estimate_AC <- estimate_A_and_C[ttt == "A", mean]
-  if (any(is.na(estimate_AB))) browser()
+  if (anchored) estimate_AC <- estimate_A_and_C[ttt == "A", mean] - estimate_A_and_C[ttt == "C", mean] else estimate_AC <- estimate_A_and_C[ttt == "A", mean]
+  # if (any(is.na(estimate_AB))) browser()
   return(list(estimate_AB = estimate_AB, estimate_AC = estimate_AC, variance_AC = variance_AC, variance_BC = variance_BC,
               df = df))
 }

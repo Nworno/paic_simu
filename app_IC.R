@@ -248,7 +248,6 @@ server <- function(input, output) {
       if (selected_row()$outcome_distribution == "normal") {
         true_treatment_effect
       } else if (selected_row()$outcome_distribution == "binomial") {
-        browser()
         dplyr::mutate(true_treatment_effect,
                       across(c(A, B, C), \(x) plogis(x)),
                       AB = exp(AB)) |>

@@ -107,9 +107,9 @@ for (num_population in df_population_parameters$population_parameters_num) {
          plot = plot_outcome_distribution, width = 10, height = 5)
 }
 
-plot_weighting <- function(df, weight_column = "trial_weights") {
+plot_weighting <- function(df, weight_column = trial_weights) {
   plot_distribution <- df |>
-    # dplyr::select(-X3, -X4) |>
+    dplyr::select(-X3, -X4) |>
     tidyr::pivot_longer(cols = c("X1", "X2"), names_to = "variable", values_to = "values") |>
     ggplot() +
     geom_density(aes(values, fill = trial, col = trial, weight = {{ weight_column }}), alpha = 0.5) +
@@ -127,7 +127,7 @@ for (num_population in df_population_parameters$population_parameters_num) {
                                              \(sublist) {
                                                non_weighted <- list(plot_weighting(sublist[[1]], weight_column = NULL))
                                                weighted <- sapply(sublist,
-                                                                  \(df) plot_weighting(df, weight_column = "trial_weights"),
+                                                                  \(df) plot_weighting(df, weight_column = trial_weights),
                                                                   USE.NAMES = TRUE,
                                                                   simplify = FALSE)
                                                c("non_weighted" = non_weighted, weighted)
