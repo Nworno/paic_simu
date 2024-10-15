@@ -93,7 +93,37 @@ list_changing_parameters <- list(
     bT2_X2 = -1,
     fbT = -0.5,
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
-  # ),
+  ),
+  "5" = list(
+    f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
+    f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
+    bT = 1,
+    bT_X1 = 1,
+    bT2_X1 = 1,
+    bT_X2 = 1,
+    bT2_X2 = 1,
+    fbT = -1,
+    bY_X1 = 0.5,
+    bY_X2 = 0.5,
+    bY_A_X1 = 1,
+    bY_A_X2 = 0,
+    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
+  ),
+  "6" = list(
+    f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
+    f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
+    bT = 1,
+    bT_X1 = 1,
+    bT2_X1 = 1,
+    bT_X2 = 1,
+    bT2_X2 = 1,
+    fbT = 1,
+    bY_X1 = 0.5,
+    bY_X2 = 0.5,
+    bY_A_X1 = 1,
+    bY_A_X2 = 0,
+    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
+    # ),
   # "5" = list(
   #   f_X1 = c(bquote(rnorm(N_pop, 0, 1))),
   #   f_X2 = c(bquote(rnorm(N_pop, 0, 1))),
@@ -116,7 +146,6 @@ list_changing_parameters <- list(
   #   fbT = -1,
   #   BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^3 + bT_X2 * X2 + bT2_X2 * X2^3))
   )
-
 )
 
 list_parameters <- lapply(list_changing_parameters, \(x) {
@@ -373,21 +402,30 @@ indirect_comparisons <- function(pop_init,
 
   if (retrieve_ps_weights) {
     print("retrieving ps weights")
-    struct_ps_df <- sapply(struct_results[["iptw"]],
+     list_dfs <- sapply(struct_results[["iptw"]],
                            \(sublist) sapply(sublist, \(subsublist) {
                              subsublist[["df"]]
                            }, simplify = FALSE, USE.NAMES = TRUE),
                            simplify = FALSE,
                            USE.NAMES = TRUE)
-    struct_results[["iptw"]] <- sapply(struct_results[["iptw"]],
-                                       \(sublist) sapply(sublist,
-                                                         \(subsublist) {
+     dfs_wo_weights <- sapply(list_dfs, \(l) l$ml[, names(l$ml) != "trial_weights", with = FALSE], simplify = FALSE, USE.NAMES = TRUE)
+     weights <- sapply(list_dfs, \(l) sapply(l, \(x) x$trial_weights, simplify = TRUE, USE.NAMES = TRUE), simplify = FALSE, USE.NAMES = TRUE)
+
+     struct_ps_df <- mapply(FUN = cbind,
+                            dfs_wo_weights,
+                            weights,
+                            SIMPLIFY = FALSE,
+                            USE.NAMES = FALSE)
+
+  }
+  struct_results[["iptw"]] <- sapply(struct_results[["iptw"]],
+                                     \(sublist) sapply(sublist,
+                                                       \(subsublist) {
                                                          subsublist[["df"]] <- NULL
                                                          return(subsublist)
-                                                         }, simplify = FALSE, USE.NAMES = TRUE),
-                                                         simplify = FALSE,
-                                                         USE.NAMES = TRUE)
-  }
+                                                       }, simplify = FALSE, USE.NAMES = TRUE),
+                                     simplify = FALSE,
+                                     USE.NAMES = TRUE)
 
 
   ##########
@@ -421,7 +459,7 @@ indirect_comparisons <- function(pop_init,
     tidyr::pivot_wider(names_from = indicator, values_from = value)
 
   list_results <- list(rectangle_results = rectangle_results)
-  if (retrieve_ps_weights) list_results$struct_ps_df = struct_ps_df
+  if (retrieve_ps_weights) list_results$struct_ps_df <- struct_ps_df
   return(list_results)
 }
 

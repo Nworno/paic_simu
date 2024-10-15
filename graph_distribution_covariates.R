@@ -39,7 +39,6 @@ for (num_population in df_population_parameters$population_parameters_num) {
   plot_propensity_distribution <- all_individuals |>
     ggplot() +
     geom_density(aes(prob_BC, fill = trial), alpha = 0.3) +
-    geom_density(aes(prob_BC), color = "black") + # Both trials together
     labs(x = NULL, y = NULL, title = "Propensity distributions")
   saveRDS(plot_propensity_distribution, file.path(path_results_experiments, "propensity_distribution.RDS"))
   ggsave(file.path(path_results_experiments, "propensity_distribution.png"),
@@ -48,14 +47,18 @@ for (num_population in df_population_parameters$population_parameters_num) {
   plot_covariates_distribution <- all_individuals |>
     ggplot() +
     geom_density(aes(variable_value, fill = trial), alpha = 0.4) +
-    facet_wrap(facets = "variable", scales = "free") +
+    facet_grid(rows = "variable", scales = "free") +
     labs(x = NULL, y = NULL, title = "Covariates distributions") +
     theme(strip.text = element_text(size = 12))
   saveRDS(plot_covariates_distribution, file.path(path_results_experiments, "covariates_distribution.RDS"))
   ggsave(file.path(path_results_experiments, "covariates_distribution.png"),
          plot = plot_covariates_distribution, width = 10, height = 5)
 
+  df_outcome <- readRDS(file.path(path_results_experiments, "average_outcome_df.RDS"))
   if (list_simulation_parameters$outcome_distribution == "normal") {
+
+    # Rajouter tableau df_outcome
+
     plot_outcome_distribution <- all_individuals |>
       ggplot() +
       # geom_density(aes(Y_obs, fill = ttt), alpha = 0.4) +
