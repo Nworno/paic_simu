@@ -418,10 +418,35 @@ indirect_comparisons <- function(pop_init,
                             USE.NAMES = FALSE)
 
   }
+  # Catching errors
+  list_dfs_errors <- sapply(struct_results[["iptw"]],
+                     \(sublist) sapply(sublist, \(subsublist) {
+                       subsublist[["boot_errors"]]
+                     }, simplify = FALSE, USE.NAMES = TRUE),
+                     simplify = FALSE,
+                     USE.NAMES = TRUE)
+  list_warnings <- sapply(struct_results[["iptw"]],
+                          \(sublist) sapply(sublist, \(subsublist) {
+                            subsublist[["boot_warnings"]]
+                          }, simplify = FALSE, USE.NAMES = TRUE),
+                          simplify = FALSE,
+                          USE.NAMES = TRUE)
+
+
+
+
   struct_results[["iptw"]] <- sapply(struct_results[["iptw"]],
                                      \(sublist) sapply(sublist,
                                                        \(subsublist) {
                                                          subsublist[["df"]] <- NULL
+                                                         subsublist[["boot_errors"]] <- NULL
+                                                         subsublist[["boot_warnings"]] <- NULL
+                                                         subsublist[["estimate"]] <- ifelse(is.numeric(subsublist[["estimate"]]),
+                                                                                            subsublist[["estimate"]],
+                                                                                            NA)
+                                                         subsublist[["variance"]] <- ifelse(is.numeric(subsublist[["variance"]]),
+                                                                                            subsublist[["variance"]],
+                                                                                            NA)
                                                          return(subsublist)
                                                        }, simplify = FALSE, USE.NAMES = TRUE),
                                      simplify = FALSE,

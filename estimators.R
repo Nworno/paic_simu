@@ -143,7 +143,7 @@ propensity_score <- function(trial_AC,
                           var_covariates = trial_B[, lapply(.SD, var), .SDcols = covariate_names] |> data.matrix()
       ) |>
         c(rep(1, nrow(trial_B)))
-      if (any(is.infinite(trial_weights))) print("ouuuh problem")
+      if (any(is.infinite(trial_weights))) print("ouuuh Infinite weights")
     } else {
       stop("No weighting method provided")
     }
@@ -163,9 +163,14 @@ propensity_score <- function(trial_AC,
   #                   family = outcome_family,
   #                   data = df,
   #                   weights = trial_weights)
-  design_glm <- survey::svydesign(id=~1, weights =~trial_weights, data = df)
-  fitted_glm <- survey::svyglm(outcome_model, design = design_glm, family = outcome_family)
-  estimate_AB <- fitted_glm$coefficients[["tttA"]]
+  estimate_AB <- tryCatch({
+    design_glm <- survey::svydesign(id=~1, weights =~trial_weights, data = df)
+    fitted_glm <- survey::svyglm(outcome_model, design = design_glm, family = outcome_family)
+    fitted_glm$coefficients[["tttA"]]
+  },
+  warning = \(w) w,
+  error = \(e) e
+  )
 
   # variance
 
@@ -175,20 +180,7 @@ propensity_score <- function(trial_AC,
   # Estimate AC
   estimate_A_and_C <- df[trial == "AC"][, .(mean = weighted.mean(Y_obs, trial_weights)), by = ttt]
   if (anchored) estimate_AC <- estimate_A_and_C[ttt == "A", mean] - estimate_A_and_C[ttt == "C", mean] else estimate_AC <- estimate_A_and_C[ttt == "A", mean]
-  if (anchored) estimate_AC <- estimate_A_and_C[ttt == "A", mean] - estimate_A_and_C[ttt == "C", mean] else estimate_AC <- estimate_A_and_C[ttt == "A", mean]
-  # if (any(is.na(estimate_AB))) browser()
-
-
-  ze_results <- list(estimate_AB = estimate_AB, estimate_AC = estimate_AC, variance_AC = variance_AC, variance_BC = variance_BC,
-                     df = df)
-
-  if (any(sapply(ze_results[c("estimate_AB", "estimate_AC", "variance_AC", "variance_BC")], \(x) !is.finite(x)))) {
-    # Quirky but the easiest way to retrieve all the results in case of problems for debugging without modifying the bootstrap code
-    ze_results$estimate_AC <- list(
-      ze_results
-    )
-  }
-  return(ze_results)
+  return(list(estimate_AB = estimate_AB, estimate_AC = estimate_AC, variance_AC = variance_AC, variance_BC = variance_BC, df = df))
 }
 
 run_propensity_score <- function(trial_AC, trial_BC, covariate_names, assignment_model, anchored, weight_estimation_method, outcome_family, retrieve_ps_weights) {
@@ -202,18 +194,20 @@ run_propensity_score <- function(trial_AC, trial_BC, covariate_names, assignment
   estimate_AB <- results$estimate_AB
   variance_BC <- results$variance_BC
   # variance_AC <- results$variance_AC
-  boot_estimates_AC <- lapply(1:N_BOOT_ITER, \(x) propensity_score(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = c("ttt")],
+  boot_estimates <- lapply(1:N_BOOT_ITER, \(x) propensity_score(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = c("ttt")],
                                                                    trial_BC,
                                                                    covariate_names,
                                                                    assignment_model,
                                                                    anchored,
                                                                    weight_estimation_method,
-                                                                   outcome_family)$estimate_AC)
-
+                                                                   outcome_family))
+  boot_estimates_AC <- sapply(boot_estimates, \(x) x$estimate_AC)
+  boot_errors <- sapply(boot_estimates[!is.finite(boot_estimates_AC)], \(x) x$df, simplify = FALSE)
+  boot_warnings <- sapply(boot_estimates[!is.finite(boot_estimates_AC)], \(x) x$estimate_AC, simplify = FALSE)
 
   # variance_AC <- Filter(is.numeric, boot_estimates_AC) |> unlist() |> var()
-  variance_AC <- Filter(!is.list, boot_estimates_AC) |> unlist() |> var()
-  problems <- Filter(is.list, boot_estimates_AC)
+  variance_AC <- tryCatch(Filter(\(x) is.finite(x), boot_estimates_AC) |> var(),
+                          error = function(e) {print("no valid estimation for AC variance"); return(NA)})
 
   # Should be close to consistent with bootstrap
   # boot_estimates_var_AC <- lapply(1:1000, \(x) propensity_score(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = c("ttt")],
@@ -228,7 +222,8 @@ run_propensity_score <- function(trial_AC, trial_BC, covariate_names, assignment
 
   variance_AB <- variance_BC + variance_AC # works only on a linear scale, so estimate output has to remain linear
   list_ps_results <- list("estimate" = estimate_AB, "variance" = variance_AB)
-  if (length(problems) > 0) list_ps_results$problems <- problems
+  if (length(boot_errors) > 0) list_ps_results$boot_errors <- boot_errors
+  if (length(boot_errors) > 0) list_ps_results$boot_warnings <- boot_warnings
   if (retrieve_ps_weights) list_ps_results$df <- results$df
   return(list_ps_results)
 }

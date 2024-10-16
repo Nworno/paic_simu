@@ -20,8 +20,20 @@ long_df_results <- lapply(nested_list_results_df, \(l) {
   lapply(l, rbindlist, idcol = "iteration", use.names = TRUE)
   }) |>
   lapply(rbindlist, idcol = "estimator_num", use.names = TRUE) |>
+  lapply(\(df) {suppressWarnings(df$problems <- NULL); return(df)}) |> # removing the column problems, to use it separately
   rbindlist(idcol = "population_parameters_num", use.names = TRUE)
 long_df_results[, estimator_num := gsub(pattern = ".*(?<=experiment_results_)(\\d+)(?=\\.RDS).*", replacement = "\\1", x = estimator_num, perl = TRUE)]
+
+long_df_problems <- lapply(nested_list_results_df, \(l) {
+  # l_wo_errors <- lapply(l, \(x) Filter(\(y) !"try-error" %in% class(y), x))
+  # l_wo_errors <- lapply(l, \(x) lapply(x, \(y) Filter(\(z) !"try-error" %in% class(z) | !"character" %in% class(z), y)))
+  # lapply(l_wo_errors, rbindlist, idcol = "iteration", use.names = TRUE)
+  # TODO: a mettre à jour pour attraper les erreurs, quand il y en aura
+  lapply(l, rbindlist, idcol = "iteration", use.names = TRUE)
+}) |>
+  lapply(rbindlist, idcol = "estimator_num", use.names = TRUE) |>
+  lapply(\(df) {df$estimate <- NULL; df$variance <- NULL; return(df)}) |> # removing the column problems, to use it separately
+  rbindlist(idcol = "population_parameters_num", use.names = TRUE, fill = TRUE)
 
 
 df_true_effects <- list.dirs(dir_experience_results) |>
@@ -213,6 +225,9 @@ correct_decision <- function(coef, se, theo) {
 }
 
 df_stats <- joined_results |>
+  # TODO: resoudre ce problème de Estimate == list
+  # mutate(Estimate = ifelse(!is.numeric(Estimate), NA_real_, Estimate))
+  # mutate(across(c(Estimate, Variance), .fns = \(x) if_else(!is.numeric(x), x, NA_real_))) |>
   group_by(Population_parameters_num, Estimator_num, Adjustment, Model, Anchored, Data) |>
   summarize(bias = get_bias(Estimate, True_effect ),
             rmse = get_RMSE(Estimate, True_effect ),
@@ -226,4 +241,5 @@ df_stats <- joined_results |>
 dir.create(file.path(dir_experience_results, "processed_results"))
 saveRDS(df_stats, file.path(dir_experience_results, "processed_results", "df_stats.rds"))
 saveRDS(joined_results, file.path(dir_experience_results, "processed_results", "joined_results.rds"))
+saveRDS(long_df_problems, file.path(dir_experience_results, "processed_results", "long_df_problems.rds"))
 
