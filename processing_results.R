@@ -240,7 +240,7 @@ df_stats <- joined_results |>
             number_na_estimate = get_number_na_estimate(Estimate),
             correct_decision = correct_decision(Estimate, Variance, True_effect),
             .groups = "drop") |>
-  pivot_longer(cols = c("bias", "rmse", "vr", "cov_95", "correct_decision"),
+  pivot_longer(cols = c("bias", "rmse", "vr", "cov_95", "correct_decision", "number_na_estimate"),
                names_to = "indicator", values_to = "values")
 
 dir.create(file.path(dir_experience_results, "processed_results"))
