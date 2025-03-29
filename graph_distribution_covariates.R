@@ -11,15 +11,19 @@ library(patchwork)
 source("env_variables.R")
 source("data_generation.R")
 
-##################################
-# Drawing covariates distributions
-##################################
+GRAPH_PUBLICATION <- TRUE
 
-N_pop <- 10^5
+N_pop <- 10^4
 path_experiment <- file.path("results_simulations", DATE_EXPERIMENT)
 df_population_parameters <- readRDS(file.path(path_experiment, "df_population_parameters.RDS"))
 
-for (num_population in df_population_parameters$population_parameters_num) {
+###############################################################
+# Drawing covariates distributions, one scenario after the other
+###############################################################
+
+scenario_of_interest <- 1:4
+plots_distribution_covariates <- list()
+for (num_population in scenario_of_interest) {
   print(num_population)
   path_results_experiments <- file.path(path_experiment, num_population)
   if (!dir.exists(path_results_experiments)) dir.create(path_results_experiments)
@@ -50,6 +54,21 @@ for (num_population in df_population_parameters$population_parameters_num) {
     facet_grid(rows = "variable", scales = "free") +
     labs(x = NULL, y = NULL, title = "Covariates distributions") +
     theme(strip.text = element_text(size = 12))
+  saveRDS(plot_covariates_distribution, file.path(path_results_experiments, "covariates_distribution.RDS"))
+  ggsave(file.path(path_results_experiments, "covariates_distribution.png"),
+         plot = plot_covariates_distribution, width = 10, height = 5)
+
+
+  plots_distribution_covariates[[num_population]] <- all_individuals[variable == "X1", ] |>
+    ggplot() +
+    geom_density(aes(variable_value, fill = trial), alpha = 0.4) +
+      # guides(fill = guide_legend(title = "Trial",
+      #                             override.aes = list(size = 4),
+      #                             label = TRUE))
+    labs(x = NULL, y = NULL, fill = "Trial") +
+    scale_fill_discrete(labels = c("a", "b")) +
+    theme(strip.text = element_text(size = 12, face = "italic"))
+
   saveRDS(plot_covariates_distribution, file.path(path_results_experiments, "covariates_distribution.RDS"))
   ggsave(file.path(path_results_experiments, "covariates_distribution.png"),
          plot = plot_covariates_distribution, width = 10, height = 5)
@@ -109,8 +128,18 @@ for (num_population in df_population_parameters$population_parameters_num) {
   ggsave(file.path(path_results_experiments, "outcomes_distribution.png"),
          plot = plot_outcome_distribution, width = 10, height = 5)
 }
+g <- plots_distribution_covariates[[1]] +
+  plots_distribution_covariates[[2]] +
+  plots_distribution_covariates[[3]] +
+  plots_distribution_covariates[[4]] +
+  plot_layout(guides = "collect") +
+  patchwork::plot_annotation(tag_levels = "1",
+                             title  = "Covariates (X1 and X2) distributions in a and b trials",
+                             subtitle = "Depending on DGM")
+ggplot2::ggsave(file.path(path_experiment, "all_covariates_distribution.png"), g)
 
-plot_weighting <- function(df, weight_column = trial_weights) {
+
+plot_weighting <- function(df, weight_column) {
   plot_distribution <- df |>
     dplyr::select(-X3, -X4) |>
     tidyr::pivot_longer(cols = c("X1", "X2"), names_to = "variable", values_to = "values") |>
@@ -120,25 +149,30 @@ plot_weighting <- function(df, weight_column = trial_weights) {
   return(plot_distribution)
 }
 
+list_dfs <- readRDS(file.path("results_simulations/20241016_184147", "1", paste0("experiment_dfs_", "3", ".RDS")))
 for (num_population in df_population_parameters$population_parameters_num) {
   for (num_estimator in df_estimators_parameters$estimator_num) {
     list_dfs <- readRDS(file.path(path_experiment, num_population, paste0("experiment_dfs_", num_estimator, ".RDS")))
-    sample_list_dfs <- list_dfs[sample(1:length(list_dfs), min(length(list_dfs), 5), replace = FALSE)]
+    sample_list_dfs <- list_dfs[sample(1:length(list_dfs), min(length(list_dfs), 3), replace = FALSE)]
 
+    #TODO: debugging ça, pourquoi les plots ne s'affichent pas au sortir de la fonction
     list_weighting_plots <- sapply(sample_list_dfs,
-                         \(iteration) sapply(iteration,
-                                             \(sublist) {
-                                               non_weighted <- list(plot_weighting(sublist[[1]], weight_column = NULL))
-                                               weighted <- sapply(sublist,
-                                                                  \(df) plot_weighting(df, weight_column = trial_weights),
-                                                                  USE.NAMES = TRUE,
-                                                                  simplify = FALSE)
-                                               c("non_weighted" = non_weighted, weighted)
-                                             },
-                                             USE.NAMES = TRUE,
-                                             simplify = FALSE),
-                         USE.NAMES = TRUE,
-                         simplify = FALSE)
+                                   \(iteration) {
+                                     # sapply(iteration,
+                                     # \(sublist) {
+                                     non_weighted <- plot_weighting(iteration[[1]], weight_column = NULL)
+                                     ml <- plot_weighting(iteration[[1]], weight_column = ml)
+                                     maic_1 <- plot_weighting(iteration[[1]], weight_column = maic_1)
+                                     maic_2 <- plot_weighting(iteration[[1]], weight_column = maic_2)
+                                     # weighted <- sapply(c("ml", "maic_1", "maic_2"),
+                                     #                    \(weight_column) plot_weighting(iteration[[1]], weight_column),
+                                     #                    USE.NAMES = TRUE,
+                                     #                    simplify = FALSE)
+                                     # c("non_weighted" = non_weighted, weighted)
+                                     return(list("non_weighted" = non_weighted, "ml" = ml, "maic_1" = maic_1, "maic_2" = maic_2))
+                                   },
+                                   USE.NAMES = TRUE,
+                                   simplify = FALSE)
     saveRDS(list_weighting_plots,
             file = file.path(file.path(path_experiment, num_population, paste0("sample_weighting_plots", num_estimator, ".RDS"))))
     # list_plots <- rapply(sample_list_dfs, plot_weighting, classes = c("data.frame", "data.table"), how = "replace")

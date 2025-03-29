@@ -307,6 +307,8 @@ indirect_comparisons <- function(pop_init,
   stopifnot(all(levels(trial_AC$ttt)[[1]] == "C",
                 levels(trial_BC$ttt)[[1]] == "C"))
 
+  is.binary <- function(x) length(unique(x) |> Filter(f = \(y) !is.na(y))) <= 2
+  are_binary_variables <- trial_AC[, .(..covariate_names, is.binary)]
 
   glm_family <- switch(outcome_distribution,
                        normal = gaussian(link = "identity"),
@@ -418,14 +420,14 @@ indirect_comparisons <- function(pop_init,
                             USE.NAMES = FALSE)
 
   }
-  # Catching errors
-  list_dfs_errors <- sapply(struct_results[["iptw"]],
+  # Retrieving errors
+  list_dfs_boot_errors <- sapply(struct_results[["iptw"]],
                      \(sublist) sapply(sublist, \(subsublist) {
                        subsublist[["boot_errors"]]
                      }, simplify = FALSE, USE.NAMES = TRUE),
                      simplify = FALSE,
                      USE.NAMES = TRUE)
-  list_warnings <- sapply(struct_results[["iptw"]],
+  list_boot_warnings <- sapply(struct_results[["iptw"]],
                           \(sublist) sapply(sublist, \(subsublist) {
                             subsublist[["boot_warnings"]]
                           }, simplify = FALSE, USE.NAMES = TRUE),
@@ -485,6 +487,8 @@ indirect_comparisons <- function(pop_init,
 
   list_results <- list(rectangle_results = rectangle_results)
   if (retrieve_ps_weights) list_results$struct_ps_df <- struct_ps_df
+  list_results$list_dfs_boot_errors <- list_dfs_boot_errors
+  list_results$list_boot_warnings <- list_boot_warnings
   return(list_results)
 }
 

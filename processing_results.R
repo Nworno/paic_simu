@@ -9,6 +9,7 @@ dir_experience_results <- file.path("results_simulations", DATE_EXPERIMENT)
 list_files <- lapply(list.dirs(dir_experience_results, full.names = TRUE), \(x) {
   list.files(x, full.names = TRUE, pattern = "^experiment_results.*\\.RDS")
 }) |> Filter(f = \(x) length(x) != 0)
+
 nested_list_results_df <- rapply(list_files, classes = "character", how = "replace", \(x) {
   sapply(x, readRDS, simplify = FALSE)
 })
@@ -22,7 +23,8 @@ long_df_results <- lapply(nested_list_results_df, \(l) {
   lapply(rbindlist, idcol = "estimator_num", use.names = TRUE) |>
   lapply(\(df) {suppressWarnings(df$problems <- NULL); return(df)}) |> # removing the column problems, to use it separately
   rbindlist(idcol = "population_parameters_num", use.names = TRUE)
-long_df_results[, estimator_num := gsub(pattern = ".*(?<=experiment_results_)(\\d+)(?=\\.RDS).*", replacement = "\\1", x = estimator_num, perl = TRUE)]
+long_df_results[, estimator_num := gsub(pattern = ".*(?<=experiment_results_)(\\d+)(?=\\.RDS).*",
+                                        replacement = "\\1", x = estimator_num, perl = TRUE)]
 
 long_df_problems <- lapply(nested_list_results_df, \(l) {
   # l_wo_errors <- lapply(l, \(x) Filter(\(y) !"try-error" %in% class(y), x))
@@ -214,6 +216,8 @@ get_cov_95 <- function(coef, se, theo) {
   mean(covered, na.rm = FALSE)
 }
 
+get_number_na_estimate <- function(Estimate) sum(is.na(Estimate))
+
 correct_decision <- function(coef, se, theo) {
   ub <- coef + qnorm(0.975)*se
   lb <- coef - qnorm(0.975)*se
@@ -233,6 +237,7 @@ df_stats <- joined_results |>
             rmse = get_RMSE(Estimate, True_effect ),
             vr = get_VR(Estimate, sqrt(Variance)),
             cov_95 = get_cov_95(Estimate, sqrt(Variance), True_effect ),
+            number_na_estimate = get_number_na_estimate(Estimate),
             correct_decision = correct_decision(Estimate, Variance, True_effect),
             .groups = "drop") |>
   pivot_longer(cols = c("bias", "rmse", "vr", "cov_95", "correct_decision"),

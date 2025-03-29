@@ -60,11 +60,15 @@ mm_obj_fun <- function(params, X) {
 mm_grad_fun <- function(params, X) {
   colSums(sweep(X, 1, exp(X %*% params), FUN = "*"))
 }
-mm <- function(df, mean_covariates, moments_2, var_covariates = NULL) {
+mm <- function(df, mean_covariates, moments_2, var_covariates = NULL, are_binary_covariates = NULL) {
   centered_mean <- sweep(df, 2, mean_covariates, "-")
 
   if (moments_2) {
-    centered_IPD2 <- sweep(df^2, 2, mean_covariates ^ 2 + var_covariates, FUN = "-")
+    if (is.null(are_binary_covariates)) stop("are_binary_covariates argument should be provided when balancing on second moments")
+    centered_IPD2 <- sweep(df[, !are_binary_covariates, drop = FALSE]^2,
+                           2,
+                           mean_covariates[!are_binary_covariates] ^ 2 + var_covariates[!are_binary_covariates],
+                           FUN = "-")
     centered_IPD <- cbind(centered_mean, centered_IPD2) |> data.matrix()
   } else {
     centered_IPD <- centered_mean
@@ -82,7 +86,8 @@ propensity_score <- function(trial_AC,
                              assignment_model,
                              anchored,
                              weight_estimation_method = c("max_likelihood", "moments_1", "moments_2"),
-                             outcome_family) {
+                             outcome_family,
+                             are_binary_covariates = NULL) {
   if (anchored) {
     ######### Anchored
     df <- data.table::rbindlist(list(trial_AC, trial_BC), fill = TRUE, use.names = TRUE)
@@ -98,14 +103,16 @@ propensity_score <- function(trial_AC,
     } else if (weight_estimation_method == "moments_1") {
       ##### MAIC weights
       trial_weights <- mm(data.matrix(trial_AC[, covariate_names, with = FALSE]),
-                       colMeans(trial_BC[, covariate_names, with = FALSE]),
-                       moments_2 = FALSE) |>
+                          colMeans(trial_BC[, covariate_names, with = FALSE]),
+                          moments_2 = FALSE) |>
         c(rep(1, nrow(trial_BC)))
     } else if (weight_estimation_method == "moments_2") {
+      trial_BC[, lapply(.SD, var), .SDcols = covariate_names]
       trial_weights <- mm(data.matrix(trial_AC[, covariate_names, with = FALSE]),
                           colMeans(trial_BC[, covariate_names, with = FALSE]),
                           moments_2 = TRUE,
-                          var_covariates = trial_BC[, lapply(.SD, var), .SDcols = covariate_names] |> data.matrix()
+                          var_covariates = trial_BC[, lapply(.SD, var), .SDcols = covariate_names] |> data.matrix(),
+                          are_binary_covariates = are_binary_covariates
       ) |>
         c(rep(1, nrow(trial_BC)))
     } else {
@@ -136,11 +143,11 @@ propensity_score <- function(trial_AC,
                           moments_2 = FALSE) |>
         c(rep(1, nrow(trial_B)))
     } else if (weight_estimation_method == "moments_2") {
-      # print("Oh yeah MAIC moments 2")
       trial_weights <- mm(data.matrix(trial_A[, covariate_names, with = FALSE]),
                           colMeans(trial_B[, covariate_names, with = FALSE]),
                           moments_2 = TRUE,
-                          var_covariates = trial_B[, lapply(.SD, var), .SDcols = covariate_names] |> data.matrix()
+                          var_covariates = trial_B[, lapply(.SD, var), .SDcols = covariate_names] |> data.matrix(),
+                          are_binary_covariates = are_binary_covariates
       ) |>
         c(rep(1, nrow(trial_B)))
       if (any(is.infinite(trial_weights))) print("ouuuh Infinite weights")
@@ -176,6 +183,7 @@ propensity_score <- function(trial_AC,
 
   # These two variances effectively only count one arm in the case of unanchored comparisons
   variance_BC <- df[trial == "BC", .(var = var(Y_obs)/.N), by = ttt][, var] |> sum()
+  #TODO: reprendre d'ici, récupérer erreur quand problème avec la variance pondérée : peut être récupérer simplement le nombre de NA
   variance_AC <- df[trial == "AC"][, .(var = weighted.var(Y_obs, trial_weights)/sum(trial_weights)), by = ttt][, var] |> sum()
   # Estimate AC
   estimate_A_and_C <- df[trial == "AC"][, .(mean = weighted.mean(Y_obs, trial_weights)), by = ttt]
@@ -183,24 +191,26 @@ propensity_score <- function(trial_AC,
   return(list(estimate_AB = estimate_AB, estimate_AC = estimate_AC, variance_AC = variance_AC, variance_BC = variance_BC, df = df))
 }
 
-run_propensity_score <- function(trial_AC, trial_BC, covariate_names, assignment_model, anchored, weight_estimation_method, outcome_family, retrieve_ps_weights) {
+run_propensity_score <- function(trial_AC, trial_BC, covariate_names, assignment_model, anchored, weight_estimation_method, outcome_family, retrieve_ps_weights, are_binary_covariates = NULL) {
   results <- propensity_score(trial_AC,
                               trial_BC,
                               covariate_names,
                               assignment_model,
                               anchored,
                               weight_estimation_method,
-                              outcome_family)
+                              outcome_family,
+                              are_binary_covariates)
   estimate_AB <- results$estimate_AB
   variance_BC <- results$variance_BC
   # variance_AC <- results$variance_AC
   boot_estimates <- lapply(1:N_BOOT_ITER, \(x) propensity_score(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = c("ttt")],
-                                                                   trial_BC,
-                                                                   covariate_names,
-                                                                   assignment_model,
-                                                                   anchored,
-                                                                   weight_estimation_method,
-                                                                   outcome_family))
+                                                                trial_BC,
+                                                                covariate_names,
+                                                                assignment_model,
+                                                                anchored,
+                                                                weight_estimation_method,
+                                                                outcome_family,
+                                                                are_binary_covariates))
   boot_estimates_AC <- sapply(boot_estimates, \(x) x$estimate_AC)
   boot_errors <- sapply(boot_estimates[!is.finite(boot_estimates_AC)], \(x) x$df, simplify = FALSE)
   boot_warnings <- sapply(boot_estimates[!is.finite(boot_estimates_AC)], \(x) x$estimate_AC, simplify = FALSE)
@@ -253,15 +263,20 @@ regression_model <- function(trial_AC,
       } else {
         df_full_ipd <- df_full_ipd[ttt %in% c("A", "B"), ]
       }
-      outcome_regression_model <- paste0("Y_obs ~ ", predictors_model)
       df_full_ipd[, ttt := relevel(as.factor(ttt), ref = "B")]
       stopifnot(levels(df_full_ipd$ttt)[[1]] == "B")
       mean_covariates_BC <- colMeans(trial_BC[, ..covariate_names])
       df_full_ipd_centered <- sweep(df_full_ipd[, ..covariate_names], 2, mean_covariates_BC, "-") |>
-        cbind(df_full_ipd[, .(Y_obs, ttt, trial)]) |> data.table::as.data.table()
-      fitted_model <- glm(outcome_regression_model,
+        cbind(df_full_ipd[, .(duree_rando_suivi_j60, Y_obs, ttt, trial)]) |> data.table::as.data.table()
+      if (outcome_family == "survival") {
+        outcome_regression_model <- as.formula(paste0("Surv(duree_rando_suivi_j60, Y_obs) ~ ", predictors_model))
+        fitted_model <- coxph(outcome_regression_model, data = df_full_ipd_centered)
+      } else {
+        outcome_regression_model <- paste0("Y_obs ~ ", predictors_model)
+        fitted_model <- glm(outcome_regression_model,
                           data = df_full_ipd_centered,
                           family = outcome_family)
+      }
       estimate_AB <- fitted_model$coefficients[["tttA"]]
       variance_AB <- vcov(fitted_model)["tttA", "tttA"]
 
@@ -275,20 +290,44 @@ regression_model <- function(trial_AC,
         trial_AC_to_center[, ttt := relevel(factor(ttt), ref = "C")]
         stopifnot(levels(trial_AC_to_center$ttt)[[1]] == "C")
         trial_BC[, ttt := relevel(factor(ttt), ref = "C")]
+        predictors_model <- paste0(predictors_model, " + trial")
       } else {
         trial_AC_to_center <- trial_AC[ttt == "A", ]
         trial_BC <- trial_BC[ttt == "B", ]
         predictors_model <- gsub("*ttt", "", predictors_model, fixed = TRUE)
       }
-      outcome_regression_model <- paste0("Y_obs ~ ", predictors_model)
       mean_covariates_BC <- colMeans(trial_BC[, ..covariate_names])
       centered_trial_AC <- sweep(trial_AC_to_center[, ..covariate_names], 2, mean_covariates_BC, "-") |>
-        cbind(trial_AC_to_center[, .(Y_obs, ttt)])
-      fitted_model_AC <- glm(outcome_regression_model,
-                             data = centered_trial_AC,
-                             family = outcome_family)
+        cbind(trial_AC_to_center[, .(duree_rando_suivi_j60, Y_obs, ttt)])
+
+      dtf <- data.table::rbindlist(list(
+        centered_trial_AC,
+        trial_BC
+      ))
+      dtf[, ttt := relevel(factor(ttt), ref = "B")]
+      if (outcome_family == "survival") {
+        outcome_regression_model <- as.formula(paste0("Surv(duree_rando_suivi_j60, Y_obs) ~ ", predictors_model))
+        fitted_model <- coxph(outcome_regression_model, data = dtf)
+        estimate_AB <- fitted_model$coefficients[["tttA"]]
+        variance_AB <- vcov(fitted_model)["tttA", "tttA"]
+        # if (anchored) {
+        #   fitted_model_BC <- coxph(Surv(duree_rando_suivi_j60, Y_obs) ~ ttt, data = trial_BC)
+        # } else {
+        #   fitted_model_BC <- coxph(Surv(duree_rando_suivi_j60, Y_obs) ~ 1, data = trial_BC)
+        # }
+      } else {
+        outcome_regression_model <- paste0("Y_obs ~ ", predictors_model)
+        fitted_model_AC <- glm(outcome_regression_model,
+                               data = centered_trial_AC,
+                               family = outcome_family)
+        if (anchored) {
+          fitted_model_BC <- glm(Y_obs ~ ttt, data = trial_BC, family = outcome_family)
+        } else {
+          fitted_model_B <- glm(Y_obs ~ 1, data = trial_BC, family = outcome_family)
+
+        }
+      }
       if (anchored) {
-        fitted_model_BC <- glm(Y_obs ~ ttt, data = trial_BC, family = outcome_family)
         estimate_BC <- fitted_model_BC$coefficients[["tttB"]]
         estimate_AC <- fitted_model_AC$coefficients[["tttA"]]
         estimate_AB <- estimate_AC - estimate_BC
@@ -297,7 +336,6 @@ regression_model <- function(trial_AC,
         variance_BC <- vcov(fitted_model_BC)["tttB", "tttB"]
         variance_AB <- variance_AC + variance_BC
       } else {
-        fitted_model_B <- glm(Y_obs ~ 1, data = trial_BC, family = outcome_family)
         estimate_B <- fitted_model_B$coefficients[["(Intercept)"]]
         estimate_A <- fitted_model_AC$coefficients[["(Intercept)"]]
         estimate_AB <- estimate_A - estimate_B

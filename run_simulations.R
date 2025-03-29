@@ -55,6 +55,12 @@ for (row_population in 1:nrow(df_population_parameters)) {
               file = file.path(dir_sub_experiment,
                                paste0("experiment_dfs_", row_estimators, ".RDS")))
     }
+    saveRDS(sapply(results_simulations, \(x) x$list_dfs_errors, USE.NAMES = TRUE, simplify = FALSE),
+            file = file.path(dir_sub_experiment,
+                             paste0("experiment_dfs_errors_", row_estimators, ".RDS")))
+    saveRDS(sapply(results_simulations, \(x) x$list_warnings, USE.NAMES = TRUE, simplify = FALSE),
+            file = file.path(dir_sub_experiment,
+                             paste0("experiment_warnings_", row_estimators, ".RDS")))
     saveRDS(sapply(results_simulations, \(x) x$rectangle_results, USE.NAMES = TRUE, simplify = FALSE),
             file = file.path(dir_sub_experiment,
                              paste0("experiment_results_", row_estimators, ".RDS")))
