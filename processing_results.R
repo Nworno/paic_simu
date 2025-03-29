@@ -201,19 +201,19 @@ classification_scenario <- left_join(combined_parameters,
 
 # Long indicators
 get_bias <- function(obs, theo) {
-  mean(obs - theo, na.rm = FALSE)
+  mean(obs - theo, na.rm = TRUE)
 }
 get_RMSE <- function(obs, theo) {
-  sqrt(mean((obs - theo)**2, na.rm = FALSE))
+  sqrt(mean((obs - theo)**2, na.rm = TRUE))
 }
 get_VR <- function(obs, se_obs) {
-  mean(se_obs, na.rm = FALSE) / sd(obs, na.rm = FALSE)
+  mean(se_obs, na.rm = TRUE) / sd(obs, na.rm = TRUE)
 }
 get_cov_95 <- function(coef, se, theo) {
   ub <- coef + qnorm(0.975)*se
   lb <- coef - qnorm(0.975)*se
   covered <- theo < ub & theo > lb
-  mean(covered, na.rm = FALSE)
+  mean(covered, na.rm = TRUE)
 }
 
 get_number_na_estimate <- function(Estimate) sum(is.na(Estimate))
@@ -225,7 +225,7 @@ correct_decision <- function(coef, se, theo) {
   sign_estimate_theo_identical <- (theo >= 0 & coef >= 0) | (theo <= 0 & coef <= 0)
   theo_is_null <- theo == 0
   correct_decision <- ifelse(theo_is_null, contains_0, sign_estimate_theo_identical)
-  mean(correct_decision, na.rm = FALSE)
+  mean(correct_decision, na.rm = TRUE)
 }
 
 df_stats <- joined_results |>
