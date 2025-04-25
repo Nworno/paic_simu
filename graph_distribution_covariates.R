@@ -1,7 +1,7 @@
 library(ggplot2)
 if ("ggthemr" %in% dimnames(installed.packages())[[1]]) ggthemr::ggthemr("flat")
-theme_update(plot.background = element_blank())
-theme_update(panel.background = element_blank())
+# theme_update(plot.background = element_blank())
+# theme_update(panel.background = element_blank())
 
 ###################################
 ## Drawing distributions covariates
@@ -15,6 +15,9 @@ GRAPH_PUBLICATION <- TRUE
 
 N_pop <- 10^4
 path_experiment <- file.path("results_simulations", DATE_EXPERIMENT)
+if (!dir.exists(file.path(path_experiment, "plots_publication"))) {
+  dir.create(file.path(path_experiment, "plots_publication"))
+}
 df_population_parameters <- readRDS(file.path(path_experiment, "df_population_parameters.RDS"))
 
 ###############################################################
@@ -61,17 +64,26 @@ for (num_population in scenario_of_interest) {
 
   plots_distribution_covariates[[num_population]] <- all_individuals[variable == "X1", ] |>
     ggplot() +
-    geom_density(aes(variable_value, fill = trial), alpha = 0.4) +
-      # guides(fill = guide_legend(title = "Trial",
-      #                             override.aes = list(size = 4),
-      #                             label = TRUE))
-    labs(x = NULL, y = NULL, fill = "Trial") +
-    scale_fill_discrete(labels = c("a", "b")) +
-    theme(strip.text = element_text(size = 12, face = "italic"))
+    geom_density(aes(variable_value, fill = trial, color = trial), alpha = 0.7) +
+    labs(x = NULL, y = NULL, fill = "Trial", color = "Trial", title = paste0("DGM-", num_population)) +
+    scale_fill_manual(values = c("AC (IPD)" = "#2ecc71", "BC (AgD)" = "#f1c40f"),
+                      labels = c("AC (IPD)" = expression(italic(a) *  "(IPD)"),
+                                 "BC (AgD)" = expression(italic(b) * "(AgD)"))
+                      ) +
+    scale_color_manual(values = c("AC (IPD)" = "#2ecc71", "BC (AgD)" = "#f1c40f"),
+                      labels = c("AC (IPD)" = expression(italic(a) * "(IPD)"),
+                                 "BC (AgD)" = expression(italic(b) * "(AgD)"))
+                      ) +
+    theme(
+      title = element_text(size = 20),
+      legend.text = element_text(size = 20),
+      legend.position = "bottom",
+      panel.background = element_blank(),
+    )
 
   saveRDS(plot_covariates_distribution, file.path(path_results_experiments, "covariates_distribution.RDS"))
-  ggsave(file.path(path_results_experiments, "covariates_distribution.png"),
-         plot = plot_covariates_distribution, width = 10, height = 5)
+  # ggsave(file.path(path_results_experiments, "covariates_distribution.png"),
+  #        plot = plot_covariates_distribution, width = 10, height = 5)
 
   df_outcome <- readRDS(file.path(path_results_experiments, "average_outcome_df.RDS"))
   if (list_simulation_parameters$outcome_distribution == "normal") {
@@ -113,187 +125,66 @@ for (num_population in scenario_of_interest) {
                                            idcol = "distribution",
                                            ) |>
       ggplot() +
-      geom_bar(aes(y = value, x = ttt, fill = prop_Y_obs), stat = "identity", alpha = 0.4) +
+      geom_bar(aes(y = value, x = ttt, fill = prop_Y_obs), stat = "identity", alpha = 0.7) +
+      scale_fill_manual(values = c("a" = "#65ADC2", "b" = "233B43"),
+                        labels = c("a" = expression(italic(a)),
+                                   "b" = expression(italic(b))
+                        )) +
       # geom_bar(aes(Y_obs, position = "dodge", alpha = 0.4) +
       facet_grid("distribution ~ trial") +
       # geom_bar(aes(Y_obs, fill = trial), alpha = 0.4) +
-      labs(x = NULL, y = NULL, title = "Outcome distribution")
-
+      labs(x = NULL, y = NULL, title = paste0("DGM-", num_population))
 
   }
   # print(plot_outcome_distribution)
   print(num_population)
   print(path_results_experiments)
   saveRDS(plot_outcome_distribution, file.path(path_results_experiments, "outcomes_distribution.RDS"))
-  ggsave(file.path(path_results_experiments, "outcomes_distribution.png"),
-         plot = plot_outcome_distribution, width = 10, height = 5)
+  # ggsave(file.path(path_results_experiments, "outcomes_distribution.png"),
+  #        plot = plot_outcome_distribution, width = 10, height = 5)
 }
 g <- plots_distribution_covariates[[1]] +
   plots_distribution_covariates[[2]] +
   plots_distribution_covariates[[3]] +
   plots_distribution_covariates[[4]] +
-  plot_layout(guides = "collect") +
-  patchwork::plot_annotation(tag_levels = "1",
-                             title  = "Covariates (X1 and X2) distributions in a and b trials",
-                             subtitle = "Depending on DGM")
-ggplot2::ggsave(file.path(path_experiment, "all_covariates_distribution.png"), g)
+  plot_layout(guides = "collect") &
+  theme(legend.position = "bottom") &
+  patchwork::plot_annotation(title  = "Covariates (X1 and X2) distributions in a and b trials")
+ggplot2::ggsave(file.path(path_experiment, "plots_publication", "all_covariates_distribution.pdf"), g)
 
 
-plot_weighting <- function(df, weight_column) {
-  plot_distribution <- df |>
-    dplyr::select(-X3, -X4) |>
-    tidyr::pivot_longer(cols = c("X1", "X2"), names_to = "variable", values_to = "values") |>
-    ggplot() +
-    geom_density(aes(values, fill = trial, col = trial, weight = {{ weight_column }}), alpha = 0.5) +
-    facet_wrap(facets = "variable")
-  return(plot_distribution)
-}
-
-list_dfs <- readRDS(file.path("results_simulations/20241016_184147", "1", paste0("experiment_dfs_", "3", ".RDS")))
-for (num_population in df_population_parameters$population_parameters_num) {
-  for (num_estimator in df_estimators_parameters$estimator_num) {
-    list_dfs <- readRDS(file.path(path_experiment, num_population, paste0("experiment_dfs_", num_estimator, ".RDS")))
-    sample_list_dfs <- list_dfs[sample(1:length(list_dfs), min(length(list_dfs), 3), replace = FALSE)]
-
-    #TODO: debugging ça, pourquoi les plots ne s'affichent pas au sortir de la fonction
-    list_weighting_plots <- sapply(sample_list_dfs,
-                                   \(iteration) {
-                                     # sapply(iteration,
-                                     # \(sublist) {
-                                     non_weighted <- plot_weighting(iteration[[1]], weight_column = NULL)
-                                     ml <- plot_weighting(iteration[[1]], weight_column = ml)
-                                     maic_1 <- plot_weighting(iteration[[1]], weight_column = maic_1)
-                                     maic_2 <- plot_weighting(iteration[[1]], weight_column = maic_2)
-                                     # weighted <- sapply(c("ml", "maic_1", "maic_2"),
-                                     #                    \(weight_column) plot_weighting(iteration[[1]], weight_column),
-                                     #                    USE.NAMES = TRUE,
-                                     #                    simplify = FALSE)
-                                     # c("non_weighted" = non_weighted, weighted)
-                                     return(list("non_weighted" = non_weighted, "ml" = ml, "maic_1" = maic_1, "maic_2" = maic_2))
-                                   },
-                                   USE.NAMES = TRUE,
-                                   simplify = FALSE)
-    saveRDS(list_weighting_plots,
-            file = file.path(file.path(path_experiment, num_population, paste0("sample_weighting_plots", num_estimator, ".RDS"))))
-    # list_plots <- rapply(sample_list_dfs, plot_weighting, classes = c("data.frame", "data.table"), how = "replace")
-  }
-}
-
-
-
-
-#### Graph distributions weighting
-# num_population = 6
-# path_results_experiments <- file.path("studying_weighting_fn", date_experiment, num_population)
-# results_experiment <- readRDS(file.path(path_results_experiments, "experiment_3.RDS"))
+# plot_weighting <- function(df, weight_column) {
+#   plot_distribution <- df |>
+#     dplyr::select(-X3, -X4) |>
+#     tidyr::pivot_longer(cols = c("X1", "X2"), names_to = "variable", values_to = "values") |>
+#     ggplot() +
+#     geom_density(aes(values, fill = trial, col = trial, weight = {{ weight_column }}), alpha = 0.5) +
+#     facet_wrap(facets = "variable")
+#   return(plot_distribution)
+# }
 #
-# all_iterations <- lapply(results_experiment, data.table::rbindlist, fill = TRUE, idcol = "trial") |>
-#   data.table::rbindlist(fill = TRUE, idcol = "iteration") |>
-#   dplyr::select(iteration, trial, id, ttt, X1, X2, prob_w_trial_AC, prob_w_trial_BC, maic_w, ps_w) |>
-#   tidyr::pivot_longer(
-#     cols = tidyselect::matches("X[0-9]"),
-#     names_to = "variable",
-#     values_to = "variable_value") |>
-#   dplyr::mutate(unweighted = 1) |>
-#   tidyr::pivot_longer(cols = c("maic_w", "ps_w", "unweighted"), names_to = "weight_name", values_to = "weight_value") |>
-#   tidyr::replace_na(list(weight_value = 1)) |>
-#   dplyr::mutate(e = weight_value / (weight_value + 1))
+# list_dfs <- readRDS(file.path("results_simulations/20241016_184147", "1", paste0("experiment_dfs_", "3", ".RDS")))
+# for (num_population in df_population_parameters$population_parameters_num) {
+#   for (num_estimator in df_estimators_parameters$estimator_num) {
+#     list_dfs <- readRDS(file.path(path_experiment, num_population, paste0("experiment_dfs_", num_estimator, ".RDS")))
+#     sample_list_dfs <- list_dfs[sample(1:length(list_dfs), min(length(list_dfs), 3), replace = FALSE)]
 #
-#
-# all_iterations |>
-#   dplyr::filter(ttt %in% c("A", "B")) |>
-#   dplyr::filter(variable == "X2") |>
-#   ggplot() +
-#   geom_density(aes(variable_value, fill = ttt, weight = weight_value), alpha = 0.4, bw = "nrd") +
-#   # geom_histogram(aes(variable_value, fill = ttt, weight = weight_value), alpha = 0.4, position = "dodge") +
-#   facet_wrap("weight_name") +
-#   labs(x = NULL, y = NULL) +
-#   theme(axis.text = element_blank(),
-#         axis.ticks = element_blank(),
-#         strip.text = element_text(size = 12))
-#
-#
-# ### Plots weights themselves
-# all_iterations |>
-#   dplyr::filter(ttt %in% c("A")) |>
-#   dplyr::filter(variable == "X2") |>
-#   dplyr::filter(weight_name != "unweighted") |>
-#   dplyr::mutate(weight_name = factor(weight_name, labels = c("maic_w" = "MAIC", "ps_w" = "IPTW"))) |>
-#   ggplot() +
-#   geom_point(aes(variable_value, e), alpha = 0.05, color = "black") +
-#   geom_hline(yintercept = 0.5, linetype = "dashed", color = "black") +
-#   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
-#   facet_grid(~weight_name) +
-#   # geom_smooth(aes(variable_value, e), color = "red", method = "lm", se = FALSE, alpha = 1, fullrange = TRUE) +
-#   ylim(c(0, 1)) +
-#   geom_density(aes(variable_value, weight = weight_value, color = "weighted", fill = "weighted"),
-#                alpha = 0.4,
-#                bw = "nrd") +
-#   geom_density(aes(variable_value, fill = ttt, color = ttt),
-#                alpha = 0.4,
-#                bw = "nrd",
-#                inherit.aes = FALSE,
-#                data = all_iterations[all_iterations$ttt %in% c("A", "B") &
-#                                        all_iterations$variable == "X2" &
-#                                        all_iterations$weight_name != "unweighted", ] |>
-#                  dplyr::mutate(weight_name = factor(weight_name, labels = c("maic_w" = "MAIC", "ps_w" = "IPTW")))) +
-#   scale_fill_manual(values = c("weighted" = "red", "A" = "#3498db", "B" = "#2ecc71"),
-#                     name = "Trial",
-#                     labels = c("weighted" = "AC weighted", "A" = "AC unweighted", "B" = "BC")) +
-#   scale_color_manual(values = c("weighted" = "red", "A" = "#3498db", "B" = "#2ecc71"),
-#                     name = "Trial",
-#                     labels = c("weighted" = "AC weighted", "A" = "AC unweighted", "B" = "BC")) +
-#   labs(y = "Propensity score", x = "X2 value") +
-#   theme(axis.text.x = element_text(size = 10),
-#         axis.text.y = element_text(size = 15),
-#         strip.text = element_text(size = 15),
-#         axis.title = element_text(size = 15),
-#         legend.text = element_text(size = 15),
-#         legend.position = "bottom", legend.box = "vertical")
-#
-#
-#
-# all_iterations |>
-#   dplyr::filter(ttt %in% c("A")) |>
-#   dplyr::filter(variable == "X2") |>
-#   dplyr::filter(weight_name != "unweighted") |>
-#   ggplot() +
-#   geom_point(aes(variable_value, weight_value, color = weight_name), alpha = 0.1) +
-#   facet_grid(~weight_name) +
-#   # geom_smooth(aes(variable_value, e, color = weight_name), alpha = 1) +
-#   geom_density(aes(variable_value, fill = ttt),
-#                alpha = 0.4,
-#                bw = "nrd",
-#                inherit.aes = FALSE,
-#                data = all_iterations[all_iterations$ttt %in% c("A", "B") &
-#                                        all_iterations$variable == "X2" &
-#                                        all_iterations$weight_name != "unweighted", ])
-
-
-
-
-# one_iteration <- results_experiment[[100]] |>
-#   data.table::rbindlist(fill = TRUE) |>
-#   dplyr::select(id, ttt, X1, X2, prob_w_trial_AC, prob_w_trial_BC, maic_w, ps_w) |>
-#   tidyr::pivot_longer(cols = tidyselect::matches("X[0-9]"), names_to = "variable", values_to = "variable_value") |>
-#   tidyr::pivot_longer(cols = c("maic_w", "ps_w"), names_to = "weight_name", values_to = "weight_value") |>
-#   dplyr::mutate(weighted_value = variable_value * weight_value) |>
-#   tidyr::pivot_longer(cols = c("variable_value", "weighted_value"),
-#                       names_to = "weight_type",
-#                       values_to = "variable_value")
-#
-#
-#
-#
-# one_iteration |>
-#   # dplyr::select(id, ttt, X1, X2, w) |>
-#   # dplyr::mutate(across(tidyselect::matches("X[0-9]+"), as.double)) |>
-#   # data.table::melt(measure.vars = patterns("X[0-9]+"), value.name = "variable_value", number = as.numerical) |>
-#   ggplot() +
-#   geom_density(aes(variable_value, fill = weight_type), alpha = 0.4) +
-#   facet_grid(ttt ~ weight_name, scales = "free") +
-#   labs(x = NULL, y = NULL) +
-#   theme(axis.text = element_blank(),
-#         axis.ticks = element_blank(),
-#         strip.text = element_text(size = 12))
-
+#     list_weighting_plots <- sapply(sample_list_dfs,
+#                                    \(iteration) {
+#                                      # sapply(iteration,
+#                                      # \(sublist) {
+#                                      non_weighted <- plot_weighting(iteration[[1]], weight_column = NULL)
+#                                      ml <- plot_weighting(iteration[[1]], weight_column = ml)
+#                                      maic_1 <- plot_weighting(iteration[[1]], weight_column = maic_1)
+#                                      maic_2 <- plot_weighting(iteration[[1]], weight_column = maic_2)
+#                                      return(list("non_weighted" = non_weighted,
+#                                                  "ml" = ml,
+#                                                  "maic_1" = maic_1,
+#                                                  "maic_2" = maic_2))
+#                                    },
+#                                    USE.NAMES = TRUE,
+#                                    simplify = FALSE)
+#     saveRDS(list_weighting_plots,
+#             file = file.path(file.path(path_experiment, num_population, paste0("sample_weighting_plots", num_estimator, ".RDS"))))
+#   }
+# }

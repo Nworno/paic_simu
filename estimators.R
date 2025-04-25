@@ -248,8 +248,6 @@ regression_model <- function(trial_AC,
                              anchored,
                              full_ipd,
                              outcome_family) {
-  # if (all(c("X1", "X2") %in% covariate_names) & bY_A_X1 == 1 & bY_A_X2 == 1 & ) browser()
-
     if (full_ipd) {
       # Classic IPD -->
       ### Classic regression model
@@ -266,12 +264,14 @@ regression_model <- function(trial_AC,
       df_full_ipd[, ttt := relevel(as.factor(ttt), ref = "B")]
       stopifnot(levels(df_full_ipd$ttt)[[1]] == "B")
       mean_covariates_BC <- colMeans(trial_BC[, ..covariate_names])
-      df_full_ipd_centered <- sweep(df_full_ipd[, ..covariate_names], 2, mean_covariates_BC, "-") |>
-        cbind(df_full_ipd[, .(duree_rando_suivi_j60, Y_obs, ttt, trial)]) |> data.table::as.data.table()
-      if (outcome_family == "survival") {
+      if (outcome_family$family == "survival") {
+        df_full_ipd_centered <- sweep(df_full_ipd[, ..covariate_names], 2, mean_covariates_BC, "-") |>
+          cbind(df_full_ipd[, .(duree_rando_suivi_j60, Y_obs, ttt, trial)]) |> data.table::as.data.table()
         outcome_regression_model <- as.formula(paste0("Surv(duree_rando_suivi_j60, Y_obs) ~ ", predictors_model))
         fitted_model <- coxph(outcome_regression_model, data = df_full_ipd_centered)
       } else {
+        df_full_ipd_centered <- sweep(df_full_ipd[, ..covariate_names], 2, mean_covariates_BC, "-") |>
+          cbind(df_full_ipd[, .(Y_obs, ttt, trial)]) |> data.table::as.data.table()
         outcome_regression_model <- paste0("Y_obs ~ ", predictors_model)
         fitted_model <- glm(outcome_regression_model,
                           data = df_full_ipd_centered,
@@ -290,22 +290,25 @@ regression_model <- function(trial_AC,
         trial_AC_to_center[, ttt := relevel(factor(ttt), ref = "C")]
         stopifnot(levels(trial_AC_to_center$ttt)[[1]] == "C")
         trial_BC[, ttt := relevel(factor(ttt), ref = "C")]
-        predictors_model <- paste0(predictors_model, " + trial")
       } else {
         trial_AC_to_center <- trial_AC[ttt == "A", ]
         trial_BC <- trial_BC[ttt == "B", ]
         predictors_model <- gsub("*ttt", "", predictors_model, fixed = TRUE)
       }
       mean_covariates_BC <- colMeans(trial_BC[, ..covariate_names])
+      if (outcome_family$family == "survival") {
       centered_trial_AC <- sweep(trial_AC_to_center[, ..covariate_names], 2, mean_covariates_BC, "-") |>
         cbind(trial_AC_to_center[, .(duree_rando_suivi_j60, Y_obs, ttt)])
-
+      } else {
+        centered_trial_AC <- sweep(trial_AC_to_center[, ..covariate_names], 2, mean_covariates_BC, "-") |>
+          cbind(trial_AC_to_center[, .(Y_obs, ttt)])
+      }
       dtf <- data.table::rbindlist(list(
         centered_trial_AC,
-        trial_BC
+        trial_BC[, names(centered_trial_AC), with = FALSE]
       ))
       dtf[, ttt := relevel(factor(ttt), ref = "B")]
-      if (outcome_family == "survival") {
+      if (outcome_family$family == "survival") {
         outcome_regression_model <- as.formula(paste0("Surv(duree_rando_suivi_j60, Y_obs) ~ ", predictors_model))
         fitted_model <- coxph(outcome_regression_model, data = dtf)
         estimate_AB <- fitted_model$coefficients[["tttA"]]
@@ -350,16 +353,6 @@ regression_model <- function(trial_AC,
 
 run_regression_model <- function(trial_AC, trial_BC, outcome_regression_model, covariate_names, full_ipd, anchored, outcome_family) {
   results <- regression_model(trial_AC, trial_BC, outcome_regression_model, covariate_names, anchored, full_ipd, outcome_family)
-  # boot_estimates <- lapply(1:N_BOOT_ITER, \(x) {
-  #   regression_model(trial_AC[sample(1:.N, size = .N, replace = TRUE), .SD, by = ttt],
-  #                    trial_BC[sample(1:.N, size = .N, replace = TRUE), .SD, by = ttt],
-  #                    outcome_regression_model,
-  #                    covariate_names,
-  #                    anchored,
-  #                    full_ipd,
-  #                    outcome_family)
-  # })
-  # variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var()
   return(list("estimate" = results$estimate_AB, "variance" = results$variance_AB))
 }
 
@@ -435,7 +428,6 @@ run_regression_model <- function(trial_AC, trial_BC, outcome_regression_model, c
 #   # potentially less biased, but systematically less precise as compared to "one-step unanchored" approach,
 #   # because takes into account unobserved confounding between A and C, and B and C
 #   # Equivalent to random effect meta analysis
-#   browser()
 #   model_AC <- glm(regression_model, glm_family, data = centered_trial_AC) # adjusted conditional effect
 #   # BC shouldn't be adjusted in most clinical trials, so this is a more favorable situation than what is usually done
 #   # in practice, because usually comparing a conditional effect to a marginal one

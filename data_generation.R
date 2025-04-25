@@ -95,32 +95,32 @@ list_changing_parameters <- list(
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
   ),
   "5" = list(
-    f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
-    f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
+    f_X1 = c(bquote(pmin(rlnorm(N_pop, 0, 0.5), 5))),
+    f_X2 = c(bquote(pmin(rlnorm(N_pop, 0, 0.5), 5))),
     bT = 1,
-    bT_X1 = 1,
-    bT2_X1 = 1,
-    bT_X2 = 1,
-    bT2_X2 = 1,
-    fbT = -1,
-    bY_X1 = 0.5,
-    bY_X2 = 0.5,
-    bY_A_X1 = 1,
+    bT_X1 = 2,
+    bT2_X1 = 0,
+    bT_X2 = 2,
+    bT2_X2 = 0,
+    fbT = 1,
+    bY_X1 = 0,
+    bY_X2 = 0,
+    bY_A_X1 = 2,
     bY_A_X2 = 0,
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
   ),
   "6" = list(
-    f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
-    f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
+    f_X1 = c(bquote(pmin(rlnorm(N_pop, 0, 0.5), 5))),
+    f_X2 = c(bquote(pmin(rlnorm(N_pop, 0, 0.5), 5))),
     bT = 1,
-    bT_X1 = 1,
-    bT2_X1 = 1,
-    bT_X2 = 1,
-    bT2_X2 = 1,
-    fbT = 1,
-    bY_X1 = 0.5,
-    bY_X2 = 0.5,
-    bY_A_X1 = 1,
+    bT_X1 = 2,
+    bT2_X1 = 0,
+    bT_X2 = 2,
+    bT2_X2 = 0,
+    fbT = -1,
+    bY_X1 = 0,
+    bY_X2 = 0,
+    bY_A_X1 = 2,
     bY_A_X2 = 0,
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
     # ),
@@ -308,7 +308,7 @@ indirect_comparisons <- function(pop_init,
                 levels(trial_BC$ttt)[[1]] == "C"))
 
   is.binary <- function(x) length(unique(x) |> Filter(f = \(y) !is.na(y))) <= 2
-  are_binary_variables <- trial_AC[, .(..covariate_names, is.binary)]
+  are_binary_covariates <- sapply(trial_AC[, ..covariate_names], is.binary)
 
   glm_family <- switch(outcome_distribution,
                        normal = gaussian(link = "identity"),
@@ -351,7 +351,8 @@ indirect_comparisons <- function(pop_init,
                                                           anchored = TRUE,
                                                           weight_estimation_method = "max_likelihood",
                                                           retrieve_ps_weights = retrieve_ps_weights,
-                                                          outcome_family = glm_family)
+                                                          outcome_family = glm_family,
+                                                          are_binary_covariates = are_binary_covariates)
   struct_results$iptw$unanchored$ml <- run_propensity_score(trial_AC,
                                                             trial_BC,
                                                             covariate_names,
@@ -359,8 +360,8 @@ indirect_comparisons <- function(pop_init,
                                                             anchored = FALSE,
                                                             weight_estimation_method = "max_likelihood",
                                                             retrieve_ps_weights = retrieve_ps_weights,
-                                                            outcome_family = glm_family)
-
+                                                            outcome_family = glm_family,
+                                                            are_binary_covariates = are_binary_covariates)
   ##################
   ### MAIC Moments 1
   ##################
@@ -370,17 +371,19 @@ indirect_comparisons <- function(pop_init,
                                                             assignment_model,
                                                             anchored = TRUE,
                                                             weight_estimation_method = "moments_1",
+                                                            retrieve_ps_weights = retrieve_ps_weights,
                                                             outcome_family = glm_family,
-                                                            retrieve_ps_weights = retrieve_ps_weights)
+                                                            are_binary_covariates = are_binary_covariates)
+
   struct_results$iptw$unanchored$maic_1 <- run_propensity_score(trial_AC,
                                                               trial_BC,
                                                               covariate_names,
                                                               anchored = FALSE,
                                                               assignment_model,
                                                               weight_estimation_method = "moments_1",
+                                                              retrieve_ps_weights = retrieve_ps_weights,
                                                               outcome_family = glm_family,
-                                                              retrieve_ps_weights = retrieve_ps_weights)
-
+                                                              are_binary_covariates = are_binary_covariates)
   ##################
   ### MAIC Moments 1
   ##################
@@ -390,17 +393,18 @@ indirect_comparisons <- function(pop_init,
                                                             assignment_model,
                                                             anchored = TRUE,
                                                             weight_estimation_method = "moments_2",
+                                                            retrieve_ps_weights = retrieve_ps_weights,
                                                             outcome_family = glm_family,
-                                                            retrieve_ps_weights = retrieve_ps_weights)
+                                                            are_binary_covariates = are_binary_covariates)
   struct_results$iptw$unanchored$maic_2 <- run_propensity_score(trial_AC,
                                                               trial_BC,
                                                               covariate_names,
                                                               anchored = FALSE,
                                                               assignment_model,
                                                               weight_estimation_method = "moments_2",
+                                                              retrieve_ps_weights = retrieve_ps_weights,
                                                               outcome_family = glm_family,
-                                                              retrieve_ps_weights = retrieve_ps_weights)
-
+                                                              are_binary_covariates = are_binary_covariates)
 
   if (retrieve_ps_weights) {
     print("retrieving ps weights")

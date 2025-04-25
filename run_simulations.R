@@ -1,14 +1,16 @@
 options(mc.cores = 1)
 
+# Idée : rajouter des variables coréllées entre elles mais distribuées non-normalement : est-ce que le fait que les MAIC-1 ne font qu'égaliser les moyennes de ces distritubtions pose problème ?
+
 source("estimators.R")
 source("data_generation.R")
 
 ####################
 # Parameters
 ####################
-N_pop <- 10^6
-N_BOOT_ITER <- 3
-n_iter <- 3
+N_pop <- 10^5
+N_BOOT_ITER <- 5
+n_iter <- 5
 
 ###############
 ### SIMULATIONS
