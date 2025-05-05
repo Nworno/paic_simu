@@ -147,6 +147,8 @@ g <- plots_distribution_covariates[[1]] +
   plots_distribution_covariates[[2]] +
   plots_distribution_covariates[[3]] +
   plots_distribution_covariates[[4]] +
+  plots_distribution_covariates[[5]] +
+  plots_distribution_covariates[[6]] +
   plot_layout(guides = "collect") &
   theme(legend.position = "bottom") &
   patchwork::plot_annotation(title  = "Covariates (X1 and X2) distributions in a and b trials")

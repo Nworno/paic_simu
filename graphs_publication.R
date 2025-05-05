@@ -29,10 +29,10 @@ df_stats <- df_stats |>
                    by = c("Population_parameters_num", "Estimator_num", "Adjustment", "Model", "Anchored", "Data"))
 
 
-
+list_population_parameters <- c("1", "2", "3", "4", "5", "6")
 
 # Treatment effect, only weighting methods, only complete models --------
-for (population_parameters_num in c("1", "2", "3", "4")) {
+for (population_parameters_num in list_population_parameters) {
 
   df_plot <- df_stats |>
     dplyr::filter(Population_parameters_num == population_parameters_num,
@@ -84,7 +84,7 @@ df_bias <- df_stats |>
   dplyr::filter(Model %in% c("MAIC_1",
                              # "MAIC_2",
                              "ML"),
-                df_stats$Population_parameters_num %in% c("1", "2", "3", "4"),
+                df_stats$Population_parameters_num %in% list_population_parameters,
                 indicator == "bias") |>
   dplyr::mutate(
     Covariates = dplyr::case_match(Estimator_num,
@@ -107,7 +107,7 @@ df_bias <- df_stats |>
 fixed_scale_x <- with(df_bias, c(min(abs(values), na.rm = TRUE), max(abs(values), na.rm = TRUE)))
 
 list_plots <- list()
-for (population_parameters_num in c("1", "2", "3", "4")) {
+for (population_parameters_num in list_population_parameters) {
   df_plot <- df_bias |>
     dplyr::filter(Population_parameters_num == population_parameters_num)
   covariate_labels <- levels(factor(df_plot$Covariates))
@@ -180,6 +180,8 @@ plot_bias_confounding <- list_plots[["1"]] +
   list_plots[["2"]] +
   list_plots[["3"]] +
   list_plots[["4"]] +
+  list_plots[["5"]] +
+  list_plots[["6"]] +
   plot_layout(ncol = 2,
               guides = "collect") &
   theme(plot.title = element_text(size = 20),
