@@ -43,12 +43,7 @@ df_default_parameters <- list(
   ))
 )
 
-# Taking all the combination of the list
-# |>
-#   expand.grid(stringsAsFactors = FALSE) |>
-#   as.data.table()
 
-#TODO Changer ça pour avoir une liste de scénarios, avec des options par défaut et des changements
 list_changing_parameters <- list(
   "1" = list(
     f_X1 = c(bquote(rnorm(N_pop, 0, 1))),
@@ -231,6 +226,9 @@ creating_population <- function(list_simulation_parameters) {
 
   pop_BC <- pop_init[trial == "BC"][sample(1:.N, N_pop, replace = TRUE), ][, ttt := rep_len(c("C", "B"), length.out = .N)] # one patient could be represented multiple times, but with such large sample sizes the correlation should not matter at all
   pop_AC <- pop_init[trial == "AC"][sample(1:.N, N_pop, replace = TRUE), ][, ttt := rep_len(c("C", "A"), length.out = .N)]
+  browser()
+  if (any(tapply(pop_init, pop_init$trial, \(x) nrow(x)/N_RCT) < 10)) warning("Less than 10 times the sample size for one trial in the superpopulation") # warning if propensity scores too extreme
+
   all_individuals <- data.table::rbindlist(list(pop_BC, pop_AC), use.names = TRUE)
   average_all_individuals <- all_individuals[, lapply(.SD, mean), .SDcols = covariate_names, by = trial]
 

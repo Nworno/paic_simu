@@ -27,7 +27,8 @@ for (population_parameters_num in list_population_parameters) {
   base_plot <- lapply(experiment_dfs, \(x) x[[switch(anchored, unanchored = 1, anchored = 2)]]) |> # 1 is unanchored, 2 is anchored
     data.table::rbindlist() |>
     dplyr::select(all_of(var), true_PS = prob_BC, trial, ttt, ml, maic_1, maic_2) |>
-    dplyr::mutate(unweighted = 1) |>
+    dplyr::mutate(unweighted = 1,
+                  true_logit_ps = 1/(1 + exp(-true_PS))) |>
     tidyr::pivot_longer(cols = c("ml", "maic_1", "maic_2", "unweighted"),
                         names_to = "weight_type", values_to = "weights") |>
     dplyr::mutate(ps = weights / (weights + 1),

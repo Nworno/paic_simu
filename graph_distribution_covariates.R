@@ -13,7 +13,7 @@ source("data_generation.R")
 
 GRAPH_PUBLICATION <- TRUE
 
-N_pop <- 10^4
+# N_pop <- 10^4
 path_experiment <- file.path("results_simulations", DATE_EXPERIMENT)
 if (!dir.exists(file.path(path_experiment, "plots_publication"))) {
   dir.create(file.path(path_experiment, "plots_publication"))
@@ -24,7 +24,7 @@ df_population_parameters <- readRDS(file.path(path_experiment, "df_population_pa
 # Drawing covariates distributions, one scenario after the other
 ###############################################################
 
-scenario_of_interest <- 1:4
+scenario_of_interest <- 1:6
 plots_distribution_covariates <- list()
 for (num_population in scenario_of_interest) {
   print(num_population)
