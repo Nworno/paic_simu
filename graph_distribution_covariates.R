@@ -13,7 +13,7 @@ source("data_generation.R")
 
 GRAPH_PUBLICATION <- TRUE
 
-# N_pop <- 10^4
+N_pop <- 10^5
 path_experiment <- file.path("results_simulations", DATE_EXPERIMENT)
 if (!dir.exists(file.path(path_experiment, "plots_publication"))) {
   dir.create(file.path(path_experiment, "plots_publication"))

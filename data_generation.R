@@ -223,11 +223,11 @@ creating_population <- function(list_simulation_parameters) {
   pop_init[, prob_BC := trial_assignement_prob(BC_trial_model, df = pop_init)]
   pop_init[, trial := rbinom(.N, 1, prob_BC) |>
              factor(levels = c(0, 1), labels = c("AC", "BC"))]
+  if (any(tapply(pop_init, pop_init$trial, \(x) nrow(x)/N_RCT) < 5)) stop("One of the trial's superpopulation size is less than 5 times the sample size per trial") # warning if propensity scores too extreme
+  if (any(tapply(pop_init, pop_init$trial, \(x) nrow(x)/N_RCT) < 10)) warning("One of the trial's superpopulation size is less than 10 times the sample size per trial") # warning if propensity scores too extreme
 
-  pop_BC <- pop_init[trial == "BC"][sample(1:.N, N_pop, replace = TRUE), ][, ttt := rep_len(c("C", "B"), length.out = .N)] # one patient could be represented multiple times, but with such large sample sizes the correlation should not matter at all
-  pop_AC <- pop_init[trial == "AC"][sample(1:.N, N_pop, replace = TRUE), ][, ttt := rep_len(c("C", "A"), length.out = .N)]
-  browser()
-  if (any(tapply(pop_init, pop_init$trial, \(x) nrow(x)/N_RCT) < 10)) warning("Less than 10 times the sample size for one trial in the superpopulation") # warning if propensity scores too extreme
+  pop_BC <- pop_init[trial == "BC"][, ttt := rep_len(c("C", "B"), length.out = .N)] # 06/05/25 : no duplication of patients anymore: with a large enough general population and a not too imbalanced population, should be fine
+  pop_AC <- pop_init[trial == "AC"][, ttt := rep_len(c("C", "A"), length.out = .N)]
 
   all_individuals <- data.table::rbindlist(list(pop_BC, pop_AC), use.names = TRUE)
   average_all_individuals <- all_individuals[, lapply(.SD, mean), .SDcols = covariate_names, by = trial]

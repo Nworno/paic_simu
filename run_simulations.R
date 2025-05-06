@@ -22,8 +22,8 @@ experiment_results_directory <- file.path("results_simulations", time_start_stri
 if (!dir.exists(experiment_results_directory)) dir.create(experiment_results_directory)
 saveRDS(df_population_parameters, file.path(experiment_results_directory, "df_population_parameters.RDS"))
 saveRDS(df_estimators_parameters, file.path(experiment_results_directory, "df_estimators_parameters.RDS"))
-# for (row_population in 1:nrow(df_population_parameters)) {
-for (row_population in 5) {
+for (row_population in 1:nrow(df_population_parameters)) {
+# for (row_population in 5) {
   dir_sub_experiment <- file.path(experiment_results_directory, row_population)
   dir.create(dir_sub_experiment)
   list_simulation_parameters <- df_population_parameters[row_population, ] |> unlist()
@@ -78,3 +78,5 @@ source("graph_distribution_covariates.R")
 source("graph_publications.R")
 source("graph_propensity_scores.R")
 source("zipping_results.R")
+beepr::beep(3)
+Sys.sleep(4)
