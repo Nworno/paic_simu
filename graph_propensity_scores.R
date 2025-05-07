@@ -28,7 +28,7 @@ for (population_parameters_num in list_population_parameters) {
     data.table::rbindlist() |>
     dplyr::select(all_of(var), true_PS = prob_BC, trial, ttt, ml, maic_1, maic_2) |>
     dplyr::mutate(unweighted = 1,
-                  true_logit_ps = 1/(1 + exp(-true_PS))) |>
+                  true_logit_ps = log(true_PS / (1 - true_PS))) |>
     tidyr::pivot_longer(cols = c("ml", "maic_1", "maic_2", "unweighted"),
                         names_to = "weight_type", values_to = "weights") |>
     dplyr::mutate(ps = weights / (weights + 1),
@@ -50,18 +50,19 @@ for (population_parameters_num in list_population_parameters) {
     alpha_points <- 5000/nrow(base_plot)
   }
   list_plots[[population_parameters_num]] <- ggplot(base_plot) +
+    geom_density(aes(x = .data[[var_col]], fill = trial, weight = weights, color = trial), alpha = 0.7) +
     geom_point(
       data = base_plot |> dplyr::filter(trial == "a" & weight_type != "Unweighted"),
       aes(x = .data[[var_col]], y = ps, color = "PS"),
       alpha = alpha_points
     ) +
-    geom_density(aes(x = .data[[var_col]], fill = trial, weight = weights, color = trial), alpha = 0.7) +
     (if (length(var) > 1) facet_grid(X_name ~ weight_type) else facet_wrap(~weight_type)) +
     labs(x = var,
          y = "Propensity Score",
          title = paste0("DGM-", population_parameters_num),
          fill = "Trial",
          color = NULL) +
+    scale_y_continuous(name = "Density", sec.axis = sec_axis(~., name = "Propensity Score")) +
     scale_color_manual(values = c("PS" = "black"), labels = c("PS" = expression("PS in " * italic(a) * " (IPD) trial"))) +
     scale_fill_manual(values = c("a" = "#2ecc71", "b" = "#f1c40f"),
                       labels = c("a" = expression(italic(a) *" (IPD)"),
@@ -70,7 +71,7 @@ for (population_parameters_num in list_population_parameters) {
     guides(color = guide_legend(override.aes = list(alpha = 1, color = 'black'))) +
     theme(text = element_text(size = 16),
           strip.text = element_text(size = 16)) +
-    ylim(0, 1) +
+    expand_limits(y = c(0, 1)) +
     theme(legend.position = "bottom",
           legend.box = "vertical") +
     (if (length(var) > 1) labs(X = "X value") else labs(X = var))

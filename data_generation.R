@@ -223,6 +223,8 @@ creating_population <- function(list_simulation_parameters) {
   pop_init[, prob_BC := trial_assignement_prob(BC_trial_model, df = pop_init)]
   pop_init[, trial := rbinom(.N, 1, prob_BC) |>
              factor(levels = c(0, 1), labels = c("AC", "BC"))]
+
+  print(tapply(pop_init, pop_init$trial, \(x) nrow(x)/N_RCT))
   if (any(tapply(pop_init, pop_init$trial, \(x) nrow(x)/N_RCT) < 5)) stop("One of the trial's superpopulation size is less than 5 times the sample size per trial") # warning if propensity scores too extreme
   if (any(tapply(pop_init, pop_init$trial, \(x) nrow(x)/N_RCT) < 10)) warning("One of the trial's superpopulation size is less than 10 times the sample size per trial") # warning if propensity scores too extreme
 

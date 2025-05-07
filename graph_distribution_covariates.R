@@ -13,7 +13,7 @@ source("data_generation.R")
 
 GRAPH_PUBLICATION <- TRUE
 
-N_pop <- 10^5
+N_pop <- 10^6
 path_experiment <- file.path("results_simulations", DATE_EXPERIMENT)
 if (!dir.exists(file.path(path_experiment, "plots_publication"))) {
   dir.create(file.path(path_experiment, "plots_publication"))
@@ -47,9 +47,9 @@ for (num_population in scenario_of_interest) {
     ggplot() +
     geom_density(aes(prob_BC, fill = trial), alpha = 0.3) +
     labs(x = NULL, y = NULL, title = "Propensity distributions")
-  saveRDS(plot_propensity_distribution, file.path(path_results_experiments, "propensity_distribution.RDS"))
-  ggsave(file.path(path_results_experiments, "propensity_distribution.png"),
-         plot = plot_propensity_distribution, width = 10, height = 5)
+  # saveRDS(plot_propensity_distribution, file.path(path_results_experiments, "propensity_distribution.RDS"))
+  # ggsave(file.path(path_results_experiments, "propensity_distribution.png"),
+  #        plot = plot_propensity_distribution, width = 10, height = 5)
 
   plot_covariates_distribution <- all_individuals |>
     ggplot() +
@@ -57,9 +57,9 @@ for (num_population in scenario_of_interest) {
     facet_grid(rows = "variable", scales = "free") +
     labs(x = NULL, y = NULL, title = "Covariates distributions") +
     theme(strip.text = element_text(size = 12))
-  saveRDS(plot_covariates_distribution, file.path(path_results_experiments, "covariates_distribution.RDS"))
-  ggsave(file.path(path_results_experiments, "covariates_distribution.png"),
-         plot = plot_covariates_distribution, width = 10, height = 5)
+  # saveRDS(plot_covariates_distribution, file.path(path_results_experiments, "covariates_distribution.RDS"))
+  # ggsave(file.path(path_results_experiments, "covariates_distribution.png"),
+  #        plot = plot_covariates_distribution, width = 10, height = 5)
 
 
   plots_distribution_covariates[[num_population]] <- all_individuals[variable == "X1", ] |>
@@ -81,7 +81,7 @@ for (num_population in scenario_of_interest) {
       panel.background = element_blank(),
     )
 
-  saveRDS(plot_covariates_distribution, file.path(path_results_experiments, "covariates_distribution.RDS"))
+  # saveRDS(plot_covariates_distribution, file.path(path_results_experiments, "covariates_distribution.RDS"))
   # ggsave(file.path(path_results_experiments, "covariates_distribution.png"),
   #        plot = plot_covariates_distribution, width = 10, height = 5)
 
@@ -139,7 +139,7 @@ for (num_population in scenario_of_interest) {
   # print(plot_outcome_distribution)
   print(num_population)
   print(path_results_experiments)
-  saveRDS(plot_outcome_distribution, file.path(path_results_experiments, "outcomes_distribution.RDS"))
+  # saveRDS(plot_outcome_distribution, file.path(path_results_experiments, "outcomes_distribution.RDS"))
   # ggsave(file.path(path_results_experiments, "outcomes_distribution.png"),
   #        plot = plot_outcome_distribution, width = 10, height = 5)
 }
