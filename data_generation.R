@@ -68,8 +68,8 @@ list_changing_parameters <- list(
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
     ),
   "3" = list(
-    f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
-    f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
+    f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
+    f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
     bT = 1,
     bT_X1 = 1,
     bT2_X1 = -1,
@@ -79,8 +79,8 @@ list_changing_parameters <- list(
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
   ),
   "4" = list(
-    f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
-    f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
+    f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
+    f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
     bT = 2,
     bT_X1 = 1,
     bT2_X1 = -1,
@@ -118,28 +118,28 @@ list_changing_parameters <- list(
     bY_A_X1 = 2,
     bY_A_X2 = 0,
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
-    # ),
-  # "5" = list(
-  #   f_X1 = c(bquote(rnorm(N_pop, 0, 1))),
-  #   f_X2 = c(bquote(rnorm(N_pop, 0, 1))),
-  #   bT = 0.5,
-  #   bT_X1 = 2,
-  #   bT2_X1 = -2,
-  #   bT_X2 = 2,
-  #   bT2_X2 = -2,
-  #   fbT = 1,
-  #   BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^3 + bT_X2 * X2 + bT2_X2 * X2^3))
-  # ),
-  # "6" = list(
-  #   f_X1 = c(bquote(rnorm(N_pop, 0, 1))),
-  #   f_X2 = c(bquote(rnorm(N_pop, 0, 1))),
-  #   bT = 0.5,
-  #   bT_X1 = 2,
-  #   bT2_X1 = -2,
-  #   bT_X2 = 2,
-  #   bT2_X2 = -2,
-  #   fbT = -1,
-  #   BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^3 + bT_X2 * X2 + bT2_X2 * X2^3))
+  ),
+  "7" = list(
+    f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
+    f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
+    bT = 0.5,
+    bT_X1 = 2,
+    bT2_X1 = -2,
+    bT_X2 = 2,
+    bT2_X2 = -2,
+    fbT = 1,
+    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^3 + bT_X2 * X2 + bT2_X2 * X2^3))
+  ),
+  "8" = list(
+    f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
+    f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
+    bT = 0.5,
+    bT_X1 = 2,
+    bT2_X1 = -2,
+    bT_X2 = 2,
+    bT2_X2 = -2,
+    fbT = -1,
+    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^3 + bT_X2 * X2 + bT2_X2 * X2^3))
   )
 )
 
