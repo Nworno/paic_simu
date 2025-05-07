@@ -224,9 +224,9 @@ creating_population <- function(list_simulation_parameters) {
   pop_init[, trial := rbinom(.N, 1, prob_BC) |>
              factor(levels = c(0, 1), labels = c("AC", "BC"))]
 
-  print(tapply(pop_init, pop_init$trial, \(x) nrow(x)/N_RCT))
-  if (any(tapply(pop_init, pop_init$trial, \(x) nrow(x)/N_RCT) < 5)) stop("One of the trial's superpopulation size is less than 5 times the sample size per trial") # warning if propensity scores too extreme
-  if (any(tapply(pop_init, pop_init$trial, \(x) nrow(x)/N_RCT) < 10)) warning("One of the trial's superpopulation size is less than 10 times the sample size per trial") # warning if propensity scores too extreme
+  print(table(pop_init$trial)/N_RCT)
+  if (any(table(pop_init$trial)/N_RCT < 5)) stop("One of the trial's superpopulation size is less than 5 times the sample size per trial") # warning if propensity scores too extreme
+  if (any(table(pop_init$trial)/N_RCT < 10)) warning("One of the trial's superpopulation size is less than 10 times the sample size per trial") # warning if propensity scores too extreme
 
   pop_BC <- pop_init[trial == "BC"][, ttt := rep_len(c("C", "B"), length.out = .N)] # 06/05/25 : no duplication of patients anymore: with a large enough general population and a not too imbalanced population, should be fine
   pop_AC <- pop_init[trial == "AC"][, ttt := rep_len(c("C", "A"), length.out = .N)]
