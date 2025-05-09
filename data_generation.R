@@ -68,28 +68,6 @@ list_changing_parameters <- list(
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
     ),
   "3" = list(
-    f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
-    f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
-    bT = 1,
-    bT_X1 = 1,
-    bT2_X1 = -1,
-    bT_X2 = 1,
-    bT2_X2 = -1,
-    fbT = 0.5,
-    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
-  ),
-  "4" = list(
-    f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
-    f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
-    bT = 2,
-    bT_X1 = 1,
-    bT2_X1 = -1,
-    bT_X2 = 1,
-    bT2_X2 = -1,
-    fbT = -0.5,
-    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
-  ),
-  "5" = list(
     f_X1 = c(bquote(pmin(rlnorm(N_pop, 0, 0.5), 5))),
     f_X2 = c(bquote(pmin(rlnorm(N_pop, 0, 0.5), 5))),
     bT = 1,
@@ -104,7 +82,7 @@ list_changing_parameters <- list(
     bY_A_X2 = 0,
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
   ),
-  "6" = list(
+  "4" = list(
     f_X1 = c(bquote(pmin(rlnorm(N_pop, 0, 0.5), 5))),
     f_X2 = c(bquote(pmin(rlnorm(N_pop, 0, 0.5), 5))),
     bT = 1,
@@ -119,14 +97,36 @@ list_changing_parameters <- list(
     bY_A_X2 = 0,
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
   ),
+  "5" = list(
+    f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
+    f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
+    bT = 1,
+    bT_X1 = 1,
+    bT2_X1 = -1,
+    bT_X2 = 1,
+    bT2_X2 = -1,
+    fbT = 0.5,
+    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
+  ),
+  "6" = list(
+    f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
+    f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
+    bT = 2,
+    bT_X1 = 1,
+    bT2_X1 = -1,
+    bT_X2 = 1,
+    bT2_X2 = -1,
+    fbT = -0.5,
+    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
+  ),
   "7" = list(
     f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
     f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
     bT = 0.5,
-    bT_X1 = 2,
-    bT2_X1 = -2,
-    bT_X2 = 2,
-    bT2_X2 = -2,
+    bT_X1 = 1,
+    bT2_X1 = -1,
+    bT_X2 = 1,
+    bT2_X2 = -1,
     fbT = 1,
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^3 + bT_X2 * X2 + bT2_X2 * X2^3))
   ),
@@ -134,10 +134,10 @@ list_changing_parameters <- list(
     f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
     f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
     bT = 0.5,
-    bT_X1 = 2,
-    bT2_X1 = -2,
-    bT_X2 = 2,
-    bT2_X2 = -2,
+    bT_X1 = 1,
+    bT2_X1 = -1,
+    bT_X2 = 1,
+    bT2_X2 = -1,
     fbT = -1,
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^3 + bT_X2 * X2 + bT2_X2 * X2^3))
   )
@@ -183,17 +183,22 @@ creating_population <- function(list_simulation_parameters) {
     setkey("id")
 
   # Finding out bT values which provides balanced probabilities
-  if (is.null(Ptrial)) {
-    Ptrial <- mean(plogis(with(pop_init, eval(BC_trial_model))))
-  } else {
-    bT <- 0
-    qPtrial <- with(pop_init, eval(BC_trial_model))
-    fct <- function(x, qP, prev) {
-      (mean(plogis(x+qP))-prev)
-    }
-    bT <- uniroot(fct, interval = c(-20, 20), qP = qPtrial, prev = 0.5)$root
-    Ptrial <- plogis(bT+qPtrial)
+
+  bT = 0
+  qPtrial <- with(pop_init, eval(BC_trial_model))
+  fct <- function(x, qP, prev) {
+    mean(plogis(x+qP)-prev)
   }
+  tryCatch({
+    bT <- uniroot(fct, interval = c(mean(qPtrial) - 100, mean(qPtrial) + 100), qP = qPtrial, prev = 0.5)$root
+  }, error = function(e) {
+    print("Error in uniroot")
+    browser()
+  })
+  # bT <- uniroot(fct, interval = c(-40, 40), qP = qPtrial, prev = 0.5)$root
+  # Ptrial <- plogis(bT+qPtrial)
+  # print(Ptrial)
+
   # trial <- rbinom(n, 1, Ptrial)
 
   trial_assignement_prob <- function(trial_assignment_model, df) {

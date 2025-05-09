@@ -182,6 +182,8 @@ plot_bias_confounding <- list_plots[["1"]] +
   list_plots[["4"]] +
   list_plots[["5"]] +
   list_plots[["6"]] +
+  list_plots[["7"]] +
+  list_plots[["8"]] +
   plot_layout(ncol = 2,
               guides = "collect") &
   theme(plot.title = element_text(size = 20),

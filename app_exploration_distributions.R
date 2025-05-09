@@ -57,12 +57,8 @@ server <- function(input, output) {
 
   bindEvent(input$runSimulation,
             x = observe({
-              N_RCT <- 5*10^4
-              N_pop <- 5*10^5
-              print(N_pop)
-              print(N_RCT)
               list_simulation_parameters <- list(
-                N_pop = 10^5,
+                N_pop = 10^6,
                 N_RCT = 10000,
                 fbT = input$fbT,
                 bT = input$bT,
