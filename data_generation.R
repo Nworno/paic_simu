@@ -97,7 +97,7 @@ list_changing_parameters <- list(
     bT2_X1 = 0,
     bT_X2 = 2,
     bT2_X2 = 0,
-    fbT = 1,
+    fbT = -1,
     bY_X1 = 0,
     bY_X2 = 0,
     bY_A_X1 = 2,
@@ -112,7 +112,7 @@ list_changing_parameters <- list(
     bT2_X1 = 0,
     bT_X2 = 2,
     bT2_X2 = 0,
-    fbT = -1,
+    fbT = 1,
     bY_X1 = 0,
     bY_X2 = 0,
     bY_A_X1 = 2,
@@ -182,6 +182,19 @@ creating_population <- function(list_simulation_parameters) {
   ) |>
     setkey("id")
 
+  # Finding out bT values which provides balanced probabilities
+  if (is.null(Ptrial)) {
+    Ptrial <- mean(plogis(with(pop_init, eval(BC_trial_model))))
+  } else {
+    bT <- 0
+    qPtrial <- with(pop_init, eval(BC_trial_model))
+    fct <- function(x, qP, prev) {
+      (mean(plogis(x+qP))-prev)
+    }
+    bT <- uniroot(fct, interval = c(-20, 20), qP = qPtrial, prev = 0.5)$root
+    Ptrial <- plogis(bT+qPtrial)
+  }
+  # trial <- rbinom(n, 1, Ptrial)
 
   trial_assignement_prob <- function(trial_assignment_model, df) {
     predicted <- with(df, eval(trial_assignment_model))

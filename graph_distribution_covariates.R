@@ -24,7 +24,7 @@ df_population_parameters <- readRDS(file.path(path_experiment, "df_population_pa
 # Drawing covariates distributions, one scenario after the other
 ###############################################################
 
-scenario_of_interest <- 1:6
+scenario_of_interest <- 1:8
 plots_distribution_covariates <- list()
 for (num_population in scenario_of_interest) {
   print(num_population)
@@ -149,6 +149,8 @@ g <- plots_distribution_covariates[[1]] +
   plots_distribution_covariates[[4]] +
   plots_distribution_covariates[[5]] +
   plots_distribution_covariates[[6]] +
+  plots_distribution_covariates[[7]] +
+  plots_distribution_covariates[[8]] +
   plot_layout(guides = "collect") &
   theme(legend.position = "bottom") &
   patchwork::plot_annotation(title  = "Covariates (X1 and X2) distributions in a and b trials")

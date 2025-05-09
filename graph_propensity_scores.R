@@ -10,7 +10,7 @@ print(DATE_EXPERIMENT)
 if (!dir.exists(file.path(dir_results, "plots_publication"))) dir.create(file.path(dir_results, "plots_publication"))
 
 
-list_population_parameters <- c("1", "2", "3", "4", "5", "6")
+list_population_parameters <- c("1", "2", "3", "4", "5", "6", "7", "8")
 # Plot propensity distribution --------
 list_plots <- list()
 for (population_parameters_num in list_population_parameters) {
@@ -83,6 +83,8 @@ plot_propensity_distributions <- list_plots[["1"]] +
   list_plots[["4"]] +
   list_plots[["5"]] +
   list_plots[["6"]] +
+  list_plots[["7"]] +
+  list_plots[["8"]] +
   plot_layout(ncol = 2, guides = "collect") &
   theme(plot.title = element_text(size = 20),
         legend.position = "bottom",
