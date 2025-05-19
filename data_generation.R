@@ -111,7 +111,7 @@ list_changing_parameters <- list(
   "6" = list(
     f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
     f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
-    bT = 2,
+    bT = 1,
     bT_X1 = 1,
     bT2_X1 = -1,
     bT_X2 = 1,
@@ -128,7 +128,7 @@ list_changing_parameters <- list(
     bT_X2 = 1,
     bT2_X2 = -1,
     fbT = 1,
-    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^3 + bT_X2 * X2 + bT2_X2 * X2^3))
+    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
   ),
   "8" = list(
     f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
@@ -139,7 +139,7 @@ list_changing_parameters <- list(
     bT_X2 = 1,
     bT2_X2 = -1,
     fbT = -1,
-    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^3 + bT_X2 * X2 + bT2_X2 * X2^3))
+    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
   )
 )
 
@@ -148,6 +148,7 @@ list_parameters <- lapply(list_changing_parameters, \(x) {
   list_parameter <- list_parameter[names(df_default_parameters)]
 })
 
+list_parameters <- list_parameters[c("7", "8")]
 df_population_parameters <- list_parameters |> tibble::as_tibble() |> t()
 colnames(df_population_parameters) <- names(df_default_parameters)
 df_population_parameters <- data.table::as.data.table(df_population_parameters)
@@ -159,7 +160,7 @@ df_population_parameters[, population_parameters_num := 1:.N]
 ##############################################
 
 ## Génère une data.frame de 10^6 ou 7 lignes
-creating_population <- function(list_simulation_parameters) {
+creating_population <- function(list_simulation_parameters, N_pop) {
   attach(list_simulation_parameters)
 
   # Modifying the coefficient values using fbT

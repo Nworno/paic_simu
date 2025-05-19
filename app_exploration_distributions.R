@@ -54,7 +54,6 @@ server <- function(input, output) {
   theme_set(theme_bw())
   theme_update(text = element_text(size = 20))
 
-
   bindEvent(input$runSimulation,
             x = observe({
               list_simulation_parameters <- list(
@@ -83,7 +82,7 @@ server <- function(input, output) {
                   bY_X1*X1 + bY_X2 * X2 +  (bY_A + bY_A_X1*X1 + bY_A_X2*X2) * A +  bY_B*B + bY_C*C
                 )
               )
-              populations <- creating_population(list_simulation_parameters)
+              populations <- creating_population(list_simulation_parameters, N_pop)
               pop_init <- populations$pop_init
 
 

@@ -166,7 +166,7 @@ for (population_parameters_num in list_population_parameters) {
       labels = covariate_labels
     ) +
     scale_x_continuous(limits = fixed_scale_x, expand = c(0, 0.1)) + #TODO: reprendre d'ici, comprendre pourquoi ne fonctionne pas
-    labs(title = paste0("DGM-", population_parameters_num), x = NULL, y = "Covariates", shape = "Anchoring") +
+    labs(title = paste0("DGM-", population_parameters_num), x = "Bias", y = "Covariates", shape = "Anchoring") +
     theme(legend.position = "bottom", legend.direction = "horizontal", legend.box = "vertical",
           axis.text.y = element_text(size = 16),
           axis.text.x = element_text(size = 14),

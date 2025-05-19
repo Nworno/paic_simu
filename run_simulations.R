@@ -1,4 +1,4 @@
-options(mc.cores = 1)
+options(mc.cores = 7)
 
 # Idée : rajouter des variables coréllées entre elles mais distribuées non-normalement : est-ce que le fait que les MAIC-1 ne font qu'égaliser les moyennes de ces distritubtions pose problème ?
 
@@ -9,8 +9,8 @@ source("data_generation.R")
 # Parameters
 ####################
 N_pop <- 2*10^6
-N_BOOT_ITER <- 5
-n_iter <- 5
+N_BOOT_ITER <- 2000
+n_iter <- 2000
 
 ###############
 ### SIMULATIONS
@@ -28,8 +28,12 @@ for (row_population in 1:nrow(df_population_parameters)) {
   dir.create(dir_sub_experiment)
   list_simulation_parameters <- df_population_parameters[row_population, ] |> unlist()
 
-  population <- creating_population(list_simulation_parameters) # pop initial
-  pop_init <- population$pop_init # données simulées
+  print("creating population")
+  print(Sys.time())
+  population <- creating_population(list_simulation_parameters, N_pop) # pop initial
+  pop_init <- population$pop_init
+  print("population created")
+  print(Sys.time())
 
   saveRDS(population$average_outcome_df, file.path(dir_sub_experiment, "average_outcome_df.RDS"))
   # Commented because huge file, so would take could much space if saved for every try
@@ -50,7 +54,9 @@ for (row_population in 1:nrow(df_population_parameters)) {
                                                          list_simulation_parameters[["outcome_distribution"]],
                                                          retrieve_ps_weights = retrieve_ps_weights)
       time_eluded <- Sys.time() - time_start_iteration
-      cat("Experiment ", row_population, ".", row_estimators, ", Iteration ", i, ", length: ", time_eluded, " seconds\n", sep = "")
+      cat("Experiment ", row_population, ".", row_estimators, ", Iteration ", i, ", length: \n", sep = "")
+      print(time_eluded)
+
       return(result_indirect_comparison)
     })
     if (retrieve_ps_weights) {
