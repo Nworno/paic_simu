@@ -29,7 +29,7 @@ df_stats <- df_stats |>
                    by = c("Population_parameters_num", "Estimator_num", "Adjustment", "Model", "Anchored", "Data"))
 
 
-list_population_parameters <- c("1", "2", "3", "4", "5", "6")
+list_population_parameters <- as.character(1:8)
 
 # Treatment effect, only weighting methods, only complete models --------
 for (population_parameters_num in list_population_parameters) {
@@ -190,7 +190,7 @@ plot_bias_confounding <- list_plots[["1"]] +
         legend.position = "bottom",
         legend.box = "vertical")
 ggsave(filename = file.path(dir_results, "plots_publication", paste0("bias_confounding.pdf")),
-       width = 15, height = 12,
+       width = 15, height = 16,
        plot = plot_bias_confounding)
 
 

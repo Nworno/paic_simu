@@ -9,11 +9,11 @@ if ("ggthemr" %in% dimnames(installed.packages())[[1]]) ggthemr::ggthemr("flat")
 library(data.table)
 library(patchwork)
 source("env_variables.R")
+N_pop <- 10^6
 source("data_generation.R")
 
 GRAPH_PUBLICATION <- TRUE
 
-N_pop <- 10^6
 path_experiment <- file.path("results_simulations", DATE_EXPERIMENT)
 if (!dir.exists(file.path(path_experiment, "plots_publication"))) {
   dir.create(file.path(path_experiment, "plots_publication"))
@@ -33,7 +33,7 @@ for (num_population in scenario_of_interest) {
   list_simulation_parameters <- df_population_parameters[df_population_parameters$population_parameters_num == num_population, ] |>
     apply(2, \(col) ifelse(is.factor(col), as.character(col), col)) |>
     unlist(recursive = TRUE)
-  populations <- creating_population(list_simulation_parameters)
+  populations <- creating_population(list_simulation_parameters, N_pop)
   pop_init <- populations$pop_init
   average_outcome_df <- populations$average_outcome_df
   average_outcome_df[, trial := factor(trial, levels = c("AC", "BC"), labels = c("AC (IPD)", "BC (AgD)"))]
@@ -75,8 +75,8 @@ for (num_population in scenario_of_interest) {
                                  "BC (AgD)" = expression(italic(b) * "(AgD)"))
                       ) +
     theme(
-      title = element_text(size = 20),
-      legend.text = element_text(size = 20),
+      title = element_text(size = 16),
+      legend.text = element_text(size = 16),
       legend.position = "bottom",
       panel.background = element_blank(),
     )

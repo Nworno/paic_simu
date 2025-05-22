@@ -44,10 +44,10 @@ for (population_parameters_num in list_population_parameters) {
   if (length(var) > 1)  {
     base_plot <- tidyr::pivot_longer(base_plot, cols = all_of(var), names_to = "X_name", values_to = "X_value")
     var_col <- "X_value"
-    alpha_points <- 10000/nrow(base_plot)
+    alpha_points <- 1000/nrow(base_plot)
   } else {
     var_col <- var
-    alpha_points <- 5000/nrow(base_plot)
+    alpha_points <- 500/nrow(base_plot)
   }
   list_plots[[population_parameters_num]] <- ggplot(base_plot) +
     geom_density(aes(x = .data[[var_col]], fill = trial, weight = weights, color = trial), alpha = 0.7) +
@@ -62,7 +62,7 @@ for (population_parameters_num in list_population_parameters) {
          title = paste0("DGM-", population_parameters_num),
          fill = "Trial",
          color = NULL) +
-    scale_y_continuous(name = "Density", sec.axis = sec_axis(~., name = "Propensity Score")) +
+    scale_y_continuous(name = "Propensity score", breaks = c(0, 1)) +
     scale_color_manual(values = c("PS" = "black"), labels = c("PS" = expression("PS in " * italic(a) * " (IPD) trial"))) +
     scale_fill_manual(values = c("a" = "#2ecc71", "b" = "#f1c40f"),
                       labels = c("a" = expression(italic(a) *" (IPD)"),
@@ -85,12 +85,12 @@ plot_propensity_distributions <- list_plots[["1"]] +
   list_plots[["6"]] +
   list_plots[["7"]] +
   list_plots[["8"]] +
-  plot_layout(ncol = 2, guides = "collect") &
+  plot_layout(ncol = 3, guides = "collect") &
   theme(plot.title = element_text(size = 20),
         legend.position = "bottom",
         legend.box = "vertical")
 ggsave(filename = file.path(dir_results, "plots_publication", paste0("PS_distributions_all_", var_col, "_", anchored, ".jpeg")), # for some reasons, pdf is much larger for that one
-       width = 15, height = 12,
+       width = 15, height = 20,
        plot = plot_propensity_distributions)
 
 
