@@ -6,7 +6,6 @@ library(data.table)
 
 df_default_parameters <- list(
   N_RCT  = c(500),
-  bT = 0.5,
   bT_X1 = 1,   # Effet de la variable binaire sur la probabilité d'être dans l'essai BC
   bT2_X1 = -0.5,   # Effet de la variable binaire sur la probabilité d'être dans l'essai BC
   bT_X2 = 1,   # Effet de la variable continue X2...
@@ -48,7 +47,6 @@ list_changing_parameters <- list(
   "1" = list(
     f_X1 = c(bquote(rnorm(N_pop, 0, 1))),
     f_X2 = c(bquote(rnorm(N_pop, 0, 1))),
-    bT = 0.5,
     bT_X1 = 1,
     bT2_X1 = -0.5,
     bT_X2 = 1,
@@ -59,7 +57,6 @@ list_changing_parameters <- list(
   "2" = list(
     f_X1 = c(bquote(rnorm(N_pop, 0, 1))),
     f_X2 = c(bquote(rnorm(N_pop, 0, 1))),
-    bT = 0.5,
     bT_X1 = 1,
     bT2_X1 = -0.5,
     bT_X2 = 1,
@@ -70,7 +67,6 @@ list_changing_parameters <- list(
   "3" = list(
     f_X1 = c(bquote(pmin(rlnorm(N_pop, 0, 0.5), 5))),
     f_X2 = c(bquote(pmin(rlnorm(N_pop, 0, 0.5), 5))),
-    bT = 1,
     bT_X1 = 2,
     bT2_X1 = 0,
     bT_X2 = 2,
@@ -85,7 +81,6 @@ list_changing_parameters <- list(
   "4" = list(
     f_X1 = c(bquote(pmin(rlnorm(N_pop, 0, 0.5), 5))),
     f_X2 = c(bquote(pmin(rlnorm(N_pop, 0, 0.5), 5))),
-    bT = 1,
     bT_X1 = 2,
     bT2_X1 = 0,
     bT_X2 = 2,
@@ -100,7 +95,6 @@ list_changing_parameters <- list(
   "5" = list(
     f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
     f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
-    bT = 1,
     bT_X1 = 1,
     bT2_X1 = -1,
     bT_X2 = 1,
@@ -111,7 +105,6 @@ list_changing_parameters <- list(
   "6" = list(
     f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
     f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
-    bT = 1,
     bT_X1 = 1,
     bT2_X1 = -1,
     bT_X2 = 1,
@@ -122,23 +115,21 @@ list_changing_parameters <- list(
   "7" = list(
     f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
     f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
-    bT = 0.5,
     bT_X1 = 1,
     bT2_X1 = -1,
     bT_X2 = 1,
     bT2_X2 = -1,
-    fbT = 1,
+    fbT = 0.5,
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
   ),
   "8" = list(
     f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
     f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
-    bT = 0.5,
     bT_X1 = 1,
     bT2_X1 = -1,
     bT_X2 = 1,
     bT2_X2 = -1,
-    fbT = -1,
+    fbT = -0.5,
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
   )
 )
@@ -148,7 +139,7 @@ list_parameters <- lapply(list_changing_parameters, \(x) {
   list_parameter <- list_parameter[names(df_default_parameters)]
 })
 
-list_parameters <- list_parameters[c("7", "8")]
+# list_parameters <- list_parameters[c("7", "8")]
 df_population_parameters <- list_parameters |> tibble::as_tibble() |> t()
 colnames(df_population_parameters) <- names(df_default_parameters)
 df_population_parameters <- data.table::as.data.table(df_population_parameters)
@@ -164,7 +155,6 @@ creating_population <- function(list_simulation_parameters, N_pop) {
   attach(list_simulation_parameters)
 
   # Modifying the coefficient values using fbT
-  bT <- bT*fbT
   bT_X1 <- bT_X1*fbT
   bT2_X1 <- bT2_X1*fbT
   bT_X2 <- bT_X2*fbT
@@ -183,7 +173,7 @@ creating_population <- function(list_simulation_parameters, N_pop) {
   ) |>
     setkey("id")
 
-  # Finding out bT values which provides balanced probabilities
+  # Finding out bT value which provides balanced probabilities
 
   bT = 0
   qPtrial <- with(pop_init, eval(BC_trial_model))
@@ -199,7 +189,7 @@ creating_population <- function(list_simulation_parameters, N_pop) {
   # bT <- uniroot(fct, interval = c(-40, 40), qP = qPtrial, prev = 0.5)$root
   # Ptrial <- plogis(bT+qPtrial)
   # print(Ptrial)
-
+  #
   # trial <- rbinom(n, 1, Ptrial)
 
   trial_assignement_prob <- function(trial_assignment_model, df) {
@@ -506,7 +496,8 @@ indirect_comparisons <- function(pop_init,
     tidyr::unnest_longer(value, indices_to = "model") |>
     tidyr::unnest_longer(value, indices_to = "indicator") |>
     dplyr::rename(adjustment = name) |>
-    tidyr::pivot_wider(names_from = indicator, values_from = value)
+    tidyr::pivot_wider(names_from = indicator, values_from = value) |>
+    dplyr::mutate(across(c(estimate, variance), as.numeric))
 
   list_results <- list(rectangle_results = rectangle_results)
   if (retrieve_ps_weights) list_results$struct_ps_df <- struct_ps_df

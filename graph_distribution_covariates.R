@@ -24,7 +24,7 @@ df_population_parameters <- readRDS(file.path(path_experiment, "df_population_pa
 # Drawing covariates distributions, one scenario after the other
 ###############################################################
 
-scenario_of_interest <- 1:8
+scenario_of_interest <- as.character(1:8)
 plots_distribution_covariates <- list()
 for (num_population in scenario_of_interest) {
   print(num_population)
@@ -57,10 +57,6 @@ for (num_population in scenario_of_interest) {
     facet_grid(rows = "variable", scales = "free") +
     labs(x = NULL, y = NULL, title = "Covariates distributions") +
     theme(strip.text = element_text(size = 12))
-  # saveRDS(plot_covariates_distribution, file.path(path_results_experiments, "covariates_distribution.RDS"))
-  # ggsave(file.path(path_results_experiments, "covariates_distribution.png"),
-  #        plot = plot_covariates_distribution, width = 10, height = 5)
-
 
   plots_distribution_covariates[[num_population]] <- all_individuals[variable == "X1", ] |>
     ggplot() +
@@ -80,10 +76,6 @@ for (num_population in scenario_of_interest) {
       legend.position = "bottom",
       panel.background = element_blank(),
     )
-
-  # saveRDS(plot_covariates_distribution, file.path(path_results_experiments, "covariates_distribution.RDS"))
-  # ggsave(file.path(path_results_experiments, "covariates_distribution.png"),
-  #        plot = plot_covariates_distribution, width = 10, height = 5)
 
   df_outcome <- readRDS(file.path(path_results_experiments, "average_outcome_df.RDS"))
   if (list_simulation_parameters$outcome_distribution == "normal") {
@@ -105,8 +97,6 @@ for (num_population in scenario_of_interest) {
       labs(x = NULL, y = NULL, title = "Marginal outcome distribution")
 
   } else if (list_simulation_parameters$outcome_distribution == "binomial") {
-    # plot the distribution of the outcome as a barplot, with proportions of the outcome as stack bars for each treatment group
-    # browser()
     marginal_outcome_distribution <- all_individuals |>
       dplyr::mutate(Y_obs = ifelse(Y_obs > 0, 1, 0), fill = ttt) |>
       dplyr::group_by(trial, ttt) |>
@@ -130,18 +120,12 @@ for (num_population in scenario_of_interest) {
                         labels = c("a" = expression(italic(a)),
                                    "b" = expression(italic(b))
                         )) +
-      # geom_bar(aes(Y_obs, position = "dodge", alpha = 0.4) +
       facet_grid("distribution ~ trial") +
-      # geom_bar(aes(Y_obs, fill = trial), alpha = 0.4) +
       labs(x = NULL, y = NULL, title = paste0("DGM-", num_population))
 
   }
-  # print(plot_outcome_distribution)
   print(num_population)
   print(path_results_experiments)
-  # saveRDS(plot_outcome_distribution, file.path(path_results_experiments, "outcomes_distribution.RDS"))
-  # ggsave(file.path(path_results_experiments, "outcomes_distribution.png"),
-  #        plot = plot_outcome_distribution, width = 10, height = 5)
 }
 g <- plots_distribution_covariates[[1]] +
   plots_distribution_covariates[[2]] +

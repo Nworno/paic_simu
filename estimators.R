@@ -211,6 +211,8 @@ run_propensity_score <- function(trial_AC, trial_BC, covariate_names, assignment
                                                                 weight_estimation_method,
                                                                 outcome_family,
                                                                 are_binary_covariates))
+  estimate_error <- if (any(c("warning", "error") %in% class(estimate_AB))) error_estimate = results$estimate_AB else error_estimate = NA
+
   boot_estimates_AC <- sapply(boot_estimates, \(x) x$estimate_AC)
   boot_errors <- sapply(boot_estimates[!is.finite(boot_estimates_AC)], \(x) x$df, simplify = FALSE)
   boot_warnings <- sapply(boot_estimates[!is.finite(boot_estimates_AC)], \(x) x$estimate_AC, simplify = FALSE)
@@ -231,9 +233,9 @@ run_propensity_score <- function(trial_AC, trial_BC, covariate_names, assignment
   # mean_variance_AC <- Filter(is.numeric, boot_estimates_var_AC) |> unlist() |> mean()
 
   variance_AB <- variance_BC + variance_AC # works only on a linear scale, so estimate output has to remain linear
-  list_ps_results <- list("estimate" = estimate_AB, "variance" = variance_AB)
-  if (length(boot_errors) > 0) list_ps_results$boot_errors <- boot_errors
-  if (length(boot_errors) > 0) list_ps_results$boot_warnings <- boot_warnings
+  list_ps_results <- list("estimate" = estimate_AB, "variance" = variance_AB, "error_estimate" = error_estimate)
+  # if (length(boot_errors) > 0) list_ps_results$boot_errors <- boot_errors
+  # if (length(boot_errors) > 0) list_ps_results$boot_warnings <- boot_warnings
   if (retrieve_ps_weights) list_ps_results$df <- results$df
   return(list_ps_results)
 }
