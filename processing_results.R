@@ -221,9 +221,6 @@ correct_decision <- function(coef, se, theo) {
 }
 
 df_stats <- joined_results |>
-  # TODO: resoudre ce problème de Estimate == list
-  # mutate(Estimate = ifelse(!is.numeric(Estimate), NA_real_, Estimate))
-  # mutate(across(c(Estimate, Variance), .fns = \(x) if_else(!is.numeric(x), x, NA_real_))) |>
   group_by(Population_parameters_num, Estimator_num, Adjustment, Model, Anchored, Data) |>
   summarize(bias = get_bias(Estimate, True_effect ),
             rmse = get_RMSE(Estimate, True_effect ),

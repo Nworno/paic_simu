@@ -9,7 +9,6 @@ if (!dir.exists(file.path(dir_results, "plots_publication"))) dir.create(file.pa
 
 
 list_population_parameters <- as.character(1:8)
-list_population_parameters <- as.character(1:2)
 # Plot propensity distribution --------
 list_plots <- list()
 for (config in 1:2) {
@@ -97,9 +96,7 @@ for (config in 1:2) {
           legend.box = "vertical",
           legend.text = element_text(size = 16))
   ggsave(filename = file.path(dir_results, "plots_publication", paste0("PS_distributions_all_", var_col, "_", anchored, ".jpeg")), # for some reasons, pdf is much larger for that one
-  # ggsave(filename = file.path(dir_results, "plots_publication", paste0("PS_distributions_all_", var_col, "_", anchored, ".pdf")), # for some reasons, pdf is 680MB
-         # width = 15, height = 20,
-         width = 15, height = 5,
+         width = 15, height = 20,
          plot = plot_propensity_distributions)
 
 }

@@ -72,10 +72,6 @@ list_changing_parameters <- list(
     bT_X2 = 2,
     bT2_X2 = 0,
     fbT = -1,
-    bY_X1 = 0,
-    bY_X2 = 0,
-    bY_A_X1 = 2,
-    bY_A_X2 = 0,
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
   ),
   "4" = list(
@@ -86,10 +82,6 @@ list_changing_parameters <- list(
     bT_X2 = 2,
     bT2_X2 = 0,
     fbT = 1,
-    bY_X1 = 0,
-    bY_X2 = 0,
-    bY_A_X1 = 2,
-    bY_A_X2 = 0,
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
   ),
   "5" = list(
@@ -99,7 +91,7 @@ list_changing_parameters <- list(
     bT2_X1 = -1,
     bT_X2 = 1,
     bT2_X2 = -1,
-    fbT = 0.5,
+    fbT = 0.2,
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
   ),
   "6" = list(
@@ -109,7 +101,7 @@ list_changing_parameters <- list(
     bT2_X1 = -1,
     bT_X2 = 1,
     bT2_X2 = -1,
-    fbT = -0.5,
+    fbT = -0.2,
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
   ),
   "7" = list(

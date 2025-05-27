@@ -29,8 +29,7 @@ df_stats <- df_stats |>
                    by = c("Population_parameters_num", "Estimator_num", "Adjustment", "Model", "Anchored", "Data"))
 
 
-# list_population_parameters <- as.character(1:8)
-list_population_parameters <- as.character(1:2)
+list_population_parameters <- as.character(1:8)
 
 # Treatment effect, only weighting methods, only complete models --------
 for (population_parameters_num in list_population_parameters) {

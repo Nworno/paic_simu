@@ -138,41 +138,7 @@ g <- plots_distribution_covariates[[1]] +
   plot_layout(guides = "collect") &
   theme(legend.position = "bottom") &
   patchwork::plot_annotation(title  = "Covariates (X1 and X2) distributions in a and b trials")
-ggplot2::ggsave(file.path(path_experiment, "plots_publication", "all_covariates_distribution.pdf"), g)
+ggplot2::ggsave(plot = g,
+                filename = file.path(path_experiment, "plots_publication", "all_covariates_distribution.pdf"),
+       width = 10, height = 10)
 
-
-# plot_weighting <- function(df, weight_column) {
-#   plot_distribution <- df |>
-#     dplyr::select(-X3, -X4) |>
-#     tidyr::pivot_longer(cols = c("X1", "X2"), names_to = "variable", values_to = "values") |>
-#     ggplot() +
-#     geom_density(aes(values, fill = trial, col = trial, weight = {{ weight_column }}), alpha = 0.5) +
-#     facet_wrap(facets = "variable")
-#   return(plot_distribution)
-# }
-#
-# list_dfs <- readRDS(file.path("results_simulations/20241016_184147", "1", paste0("experiment_dfs_", "3", ".RDS")))
-# for (num_population in df_population_parameters$population_parameters_num) {
-#   for (num_estimator in df_estimators_parameters$estimator_num) {
-#     list_dfs <- readRDS(file.path(path_experiment, num_population, paste0("experiment_dfs_", num_estimator, ".RDS")))
-#     sample_list_dfs <- list_dfs[sample(1:length(list_dfs), min(length(list_dfs), 3), replace = FALSE)]
-#
-#     list_weighting_plots <- sapply(sample_list_dfs,
-#                                    \(iteration) {
-#                                      # sapply(iteration,
-#                                      # \(sublist) {
-#                                      non_weighted <- plot_weighting(iteration[[1]], weight_column = NULL)
-#                                      ml <- plot_weighting(iteration[[1]], weight_column = ml)
-#                                      maic_1 <- plot_weighting(iteration[[1]], weight_column = maic_1)
-#                                      maic_2 <- plot_weighting(iteration[[1]], weight_column = maic_2)
-#                                      return(list("non_weighted" = non_weighted,
-#                                                  "ml" = ml,
-#                                                  "maic_1" = maic_1,
-#                                                  "maic_2" = maic_2))
-#                                    },
-#                                    USE.NAMES = TRUE,
-#                                    simplify = FALSE)
-#     saveRDS(list_weighting_plots,
-#             file = file.path(file.path(path_experiment, num_population, paste0("sample_weighting_plots", num_estimator, ".RDS"))))
-#   }
-# }
