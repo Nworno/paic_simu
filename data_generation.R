@@ -91,7 +91,7 @@ list_changing_parameters <- list(
     bT2_X1 = -1,
     bT_X2 = 1,
     bT2_X2 = -1,
-    fbT = 0.2,
+    fbT = 0.4,
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
   ),
   "6" = list(
@@ -101,7 +101,7 @@ list_changing_parameters <- list(
     bT2_X1 = -1,
     bT_X2 = 1,
     bT2_X2 = -1,
-    fbT = -0.2,
+    fbT = -0.4,
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
   ),
   "7" = list(
@@ -131,7 +131,7 @@ list_parameters <- lapply(list_changing_parameters, \(x) {
   list_parameter <- list_parameter[names(df_default_parameters)]
 })
 
-# list_parameters <- list_parameters[c("7", "8")]
+list_parameters <- list_parameters[c("6")]
 df_population_parameters <- list_parameters |> tibble::as_tibble() |> t()
 colnames(df_population_parameters) <- names(df_default_parameters)
 df_population_parameters <- data.table::as.data.table(df_population_parameters)
