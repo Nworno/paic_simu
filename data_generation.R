@@ -91,7 +91,7 @@ list_changing_parameters <- list(
     bT2_X1 = -1,
     bT_X2 = 1,
     bT2_X2 = -1,
-    fbT = 0.4,
+    fbT = 0.5,
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
   ),
   "6" = list(
@@ -101,7 +101,7 @@ list_changing_parameters <- list(
     bT2_X1 = -1,
     bT_X2 = 1,
     bT2_X2 = -1,
-    fbT = -0.4,
+    fbT = -0.5,
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
   ),
   "7" = list(
@@ -131,7 +131,6 @@ list_parameters <- lapply(list_changing_parameters, \(x) {
   list_parameter <- list_parameter[names(df_default_parameters)]
 })
 
-list_parameters <- list_parameters[c("6")]
 df_population_parameters <- list_parameters |> tibble::as_tibble() |> t()
 colnames(df_population_parameters) <- names(df_default_parameters)
 df_population_parameters <- data.table::as.data.table(df_population_parameters)
@@ -147,14 +146,11 @@ creating_population <- function(list_simulation_parameters, N_pop) {
   attach(list_simulation_parameters)
 
   # Modifying the coefficient values using fbT
+
   bT_X1 <- bT_X1*fbT
   bT2_X1 <- bT2_X1*fbT
   bT_X2 <- bT_X2*fbT
   bT2_X2 <- bT2_X2*fbT
-  # bT_X3 <- bT_X3*fbT
-  # bT2_X3 <- bT2_X3*fbT
-  # bT_X4 <- bT_X4*fbT
-  # bT2_X4 <- bT2_X4*fbT
 
   pop_init <- data.table(
     id = 1:N_pop,
@@ -178,11 +174,7 @@ creating_population <- function(list_simulation_parameters, N_pop) {
     print("Error in uniroot")
     browser()
   })
-  # bT <- uniroot(fct, interval = c(-40, 40), qP = qPtrial, prev = 0.5)$root
-  # Ptrial <- plogis(bT+qPtrial)
-  # print(Ptrial)
-  #
-  # trial <- rbinom(n, 1, Ptrial)
+
 
   trial_assignement_prob <- function(trial_assignment_model, df) {
     predicted <- with(df, eval(trial_assignment_model))

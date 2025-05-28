@@ -170,14 +170,24 @@ propensity_score <- function(trial_AC,
   #                   family = outcome_family,
   #                   data = df,
   #                   weights = trial_weights)
-  estimate_AB <- tryCatch({
+
+  tryCatch.W.E <- function(expr) {
+    # taken from demo(error.catching)
+    W <- NULL
+    w.handler <- function(w) { # warning handler
+      W <<- w
+      invokeRestart("muffleWarning")
+    }
+    list(value = withCallingHandlers(tryCatch(expr, error = function(e) e),
+                                     warning = w.handler),
+         warning = W)
+  }
+
+  estimate_AB <- tryCatch.W.E({
     design_glm <- survey::svydesign(id=~1, weights =~trial_weights, data = df)
     fitted_glm <- survey::svyglm(outcome_model, design = design_glm, family = outcome_family)
     fitted_glm$coefficients[["tttA"]]
-  },
-  warning = \(w) w,
-  error = \(e) e
-  )
+  })
 
   # variance
 
@@ -211,7 +221,14 @@ run_propensity_score <- function(trial_AC, trial_BC, covariate_names, assignment
                                                                 weight_estimation_method,
                                                                 outcome_family,
                                                                 are_binary_covariates))
-  estimate_error <- if (any(c("warning", "error") %in% class(estimate_AB))) error_estimate = results$estimate_AB else error_estimate = NA
+  estimate_error <- if (!is.null(estimate_AB$warning)) {
+    error_estimate = estimate_AB$warning
+  } else if ("error" %in% class(estimate_AB$value)) {
+    error_estimate = estimate_AB$value
+    estimate_AB$value <- NA # estimate_AB$value is a real number when no error, ie when warning or nothing
+  } else {
+    error_estimate = NA
+  }
 
   boot_estimates_AC <- sapply(boot_estimates, \(x) x$estimate_AC)
   boot_errors <- sapply(boot_estimates[!is.finite(boot_estimates_AC)], \(x) x$df, simplify = FALSE)
@@ -221,19 +238,9 @@ run_propensity_score <- function(trial_AC, trial_BC, covariate_names, assignment
   variance_AC <- tryCatch(Filter(\(x) is.finite(x), boot_estimates_AC) |> var(),
                           error = function(e) {print("no valid estimation for AC variance"); return(NA)})
 
-  # Should be close to consistent with bootstrap
-  # boot_estimates_var_AC <- lapply(1:1000, \(x) propensity_score(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = c("ttt")],
-  #                                                           trial_BC,
-  #                                                           covariate_names,
-  #                                                           assignment_model,
-  #                                                           anchored,
-  #                                                           weight_estimation_method,
-  #                                                           outcome_family,
-  #                                                           studying_populations)$variance_AC)
-  # mean_variance_AC <- Filter(is.numeric, boot_estimates_var_AC) |> unlist() |> mean()
 
   variance_AB <- variance_BC + variance_AC # works only on a linear scale, so estimate output has to remain linear
-  list_ps_results <- list("estimate" = estimate_AB, "variance" = variance_AB, "error_estimate" = error_estimate)
+  list_ps_results <- list("estimate" = estimate_AB$value, "variance" = variance_AB, "error_estimate" = error_estimate)
   # if (length(boot_errors) > 0) list_ps_results$boot_errors <- boot_errors
   # if (length(boot_errors) > 0) list_ps_results$boot_warnings <- boot_warnings
   if (retrieve_ps_weights) list_ps_results$df <- results$df
@@ -282,8 +289,6 @@ regression_model <- function(trial_AC,
       estimate_AB <- fitted_model$coefficients[["tttA"]]
       variance_AB <- vcov(fitted_model)["tttA", "tttA"]
 
-      # summary(fitted_model)
-      # df_full_ipd_centered[, var(Y_obs)/.N, by = c("trial", "ttt")][, V1] |> sum()
 
     } else {
       #### STC
@@ -315,11 +320,6 @@ regression_model <- function(trial_AC,
         fitted_model <- coxph(outcome_regression_model, data = dtf)
         estimate_AB <- fitted_model$coefficients[["tttA"]]
         variance_AB <- vcov(fitted_model)["tttA", "tttA"]
-        # if (anchored) {
-        #   fitted_model_BC <- coxph(Surv(duree_rando_suivi_j60, Y_obs) ~ ttt, data = trial_BC)
-        # } else {
-        #   fitted_model_BC <- coxph(Surv(duree_rando_suivi_j60, Y_obs) ~ 1, data = trial_BC)
-        # }
       } else {
         outcome_regression_model <- paste0("Y_obs ~ ", predictors_model)
         fitted_model_AC <- glm(outcome_regression_model,
@@ -358,179 +358,3 @@ run_regression_model <- function(trial_AC, trial_BC, outcome_regression_model, c
   return(list("estimate" = results$estimate_AB, "variance" = results$variance_AB))
 }
 
-
-################################
-##### TREATMENT EFFECTS variance
-################################
-# Under a given treatment, the terms of the outcome model are independent,
-# and the variance of the outcome is therefore the sum of the variances
-# of the individual terms (taking into account that treatment is constant, therefore coefficients for a given treatment does not need to be taken into account)
-# If there are dependencies between terms, then the outcome variance has to take into account covariances
-# var_theo_A <- (bY_X1 + bYA_X1)^2 * (prop_X1) * (1 - prop_X1) # Var(aX) = a^2 Var(X)
-# var_theo_B <- (bY_X1)^2 * (prop_X1) * (1 - prop_X1)
-# var_theo_C <- (bY_X1)^2 * (prop_X1) * (1 - prop_X1)
-#
-# var_theo_AB <- var_theo_A/N_RCT + var_theo_B/N_RCT
-
-
-
-#########
-### MAIC
-#########
-#
-# maic <- function(trial_AC, trial_BC, covariate_names, anchored, outcome_family, studying_populations = FALSE) {
-#   if (anchored) {
-#     mean_trial_BC <- trial_BC[, lapply(.SD, mean), .SDcols = covariate_names] |> data.matrix()
-#     centered_covariates <- sweep(trial_AC[, ..covariate_names] |> data.matrix(),
-#                                  2,
-#                                  mean_trial_BC,
-#                                  FUN = "-")
-#   } else {
-#     mean_trial_B <- trial_BC[ttt == "B", lapply(.SD, mean), .SDcols = covariate_names] |> data.matrix()
-#     centered_covariates <- sweep(trial_AC[ttt == "A", ..covariate_names] |> data.matrix(),
-#                                  2,
-#                                  mean_trial_B,
-#                                  FUN = "-")
-#   }
-#   weights <- mm(centered_covariates)
-#   # ess <- sum(weights)^2 / sum(weights^2)
-#   if (studying_populations) {
-#     return(weights)
-#   }
-#   if (anchored) {
-#     trial_AC$weights <- weights
-#     fitted_AC_w <- glm(Y_obs ~ ttt, data = trial_AC, family = outcome_family, weights = weights)
-#     anchored_MAIC_AC <- fitted_AC_w$coefficients[["tttA"]]
-#     # Equivalent to
-#     # trial_AC[ttt == "A", weighted.mean(Y_obs, weights)] - trial_AC[ttt == "C", weighted.mean(Y_obs, weights)]
-#     obs_marginal_BC <- trial_BC[ttt == "B", mean(Y_obs)] - trial_BC[ttt == "C", mean(Y_obs)]
-#     estimate_AB <- anchored_MAIC_AC - obs_marginal_BC
-#   } else {
-#     estimate_AB <- trial_AC[ttt == "A", weighted.mean(Y_obs, weights)] - trial_BC[ttt == "B", mean(Y_obs)]
-#   }
-#   return(estimate_AB)
-# }
-#
-# run_maic <- function(trial_AC, trial_BC, covariate_names, anchored, outcome_family) {
-#   stopifnot(levels(trial_AC$ttt)[[1]] == "C")
-#   estimate <- maic(trial_AC, trial_BC, covariate_names, anchored, outcome_family)
-#   boot_estimates <- lapply(1:N_BOOT_ITER, \(x) maic(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
-#                                                     trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
-#                                                     covariate_names,
-#                                                     anchored,
-#                                                     outcome_family))
-#   variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var()
-#   return(list("estimate" = estimate, "variance" = variance))
-# }
-
-#
-# anchored_conditional_estimation <- function(centered_trial_AC, centered_trial_BC, regression_model, glm_family) {
-#   # two-steps individual patient data network meta analysis --> would be interesting to compare performance differences of this method
-#   # as compared to random effect NMA
-#   # potentially less biased, but systematically less precise as compared to "one-step unanchored" approach,
-#   # because takes into account unobserved confounding between A and C, and B and C
-#   # Equivalent to random effect meta analysis
-#   model_AC <- glm(regression_model, glm_family, data = centered_trial_AC) # adjusted conditional effect
-#   # BC shouldn't be adjusted in most clinical trials, so this is a more favorable situation than what is usually done
-#   # in practice, because usually comparing a conditional effect to a marginal one
-#   model_BC <- glm(regression_model, glm_family, data = centered_trial_BC) # adjusted conditional effect
-#   estimate_AC <- model_AC$coefficients[["tttA"]]
-#   estimate_BC <- model_BC$coefficients[["tttB"]]
-#   estimate_AB <- estimate_AC - estimate_BC
-#
-#   ## Equivalent to
-#   # model_AC <- glm(formula(Y_obs ~ X1*ttt), glm_family, trial_AC)
-#   # estimate_AC <- model_AC$coefficients[["tttA"]] + model_AC$coefficients[["X1:tttA"]] * trial_BC[, mean(X1)]
-#   # model_BC <- glm(formula(Y_obs ~ X1*ttt), glm_family, data = trial_BC)
-#   # estimate_BC <- model_BC$coefficients[["tttB"]] + model_BC$coefficients[["X1:tttB"]] * trial_BC[, mean(X1)]
-#   # estimate_AB <- estimate_AC - estimate_BC
-#   return(estimate_AB)
-# }
-
-# run_anchored_conditional_estimation <- function(centered_trial_AC, trial_BC, outcome_regression_model, glm_family) {
-#   estimate <- anchored_conditional_estimation(centered_trial_AC, trial_BC, outcome_regression_model, glm_family)
-#   boot_estimates <- lapply(1:N_BOOT_ITER, \(x) {
-#     anchored_conditional_estimation(
-#       centered_trial_AC[sample(1:.N, size = .N, replace = TRUE), .SD, by = ttt],
-#       trial_BC[sample(1:.N, size = .N, replace = TRUE), .SD, by = ttt],
-#       outcome_regression_model, gaussian)
-#   })
-#   variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var()
-#   return(list("estimate" = estimate, "variance" = variance))
-# }
-
-### Unanchored
-#### Note: not really following either anchored or unanchored scheme, basically
-#### unanchored analysis when a common comparator is available: make the assumption
-#### that there are no unobserved imbalance in terms of prognostic factors or
-#### TEM between trials. Will be more precise in such a case, but biased in case
-#### of residual confounding. Not used currently
-# botharms_unanchored_conditional_estimation <- function(centered_trial_AC, centered_trial_BC, regression_model, glm_family) {
-#   both_trials <- rbind(centered_trial_AC, centered_trial_BC)
-#   both_trials[, `:=`(ttt = factor(ttt, levels = c("B", "A", "C")))]
-#   model_AB <- glm(regression_model, data = both_trials, family = glm_family) # conditional effect
-#   estimate_AB <- model_AB$coefficients[["tttA"]]
-# }
-#
-
-
-# run_unanchored_conditional_estimation <- function(centered_trial_AC, centered_trial_BC, outcome_regression_model, glm_family) {
-#   estimate <- unanchored_conditional_estimation(centered_trial_AC, centered_trial_BC, outcome_regression_model, glm_family)
-#   boot_estimates <- lapply(1:N_BOOT_ITER, \(x) unanchored_conditional_estimation(
-#     centered_trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
-#     centered_trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
-#     outcome_regression_model,
-#     glm_family
-#   ))
-#   variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var()
-#   return(list("estimate" = estimate, "variance" = variance))
-# }
-
-
-
-
-##########
-###### STC
-##########
-
-
-# stc <- function(centered_trial_AC, trial_BC, anchored, outcome_regression_model, covariate_names, outcome_family = gaussian) {
-#   if (anchored) {
-#     average_observed_BC <- trial_BC[ttt == "B", mean(Y_obs)] - trial_BC[ttt == "C", mean(Y_obs)]
-#     stc_model <- glm(outcome_regression_model,
-#                      family = outcome_family,
-#                      data = centered_trial_AC)
-#     simulated_AC <- stc_model$coefficients[["tttA"]]
-#     # Equivalent to
-#     # stc_model <- glm(Y_obs ~ ttt*X1, family = gaussian, data = trial_AC)
-#     # estimate_AC <- stc_model$coefficients[["tttA"]] + stc_model$coefficients[["tttA:X1"]] * Ag_trial_BC[, sum(mean_X1*n)/sum(n)]
-#     estimate_AB <- simulated_AC - average_observed_BC
-#   } else {
-#     outcome_regression_model <- paste0("Y_obs ~ ", paste0(covariate_names, collapse = " + "))
-#     average_observed_B <- trial_BC[ttt == "B", mean(Y_obs)]
-#     regression_model(trial_AC[ttt == "A", ], outcome_regression_model, outcome_family, "tttA")
-#
-#     stc_model <- glm(outcome_regression_model,
-#                      family = outcome_family,
-#                      data = centered_trial_AC[ttt == "A",])
-#     simulated_A <- stc_model$coefficients[["(Intercept)"]]
-#     # Equivalent to
-#     # ttt_A <- trial_AC[ttt == "A"]
-#     # stc_model <- glm(Y_obs ~ X1, family = gaussian, data = ttt_A)
-#     # simulated_A <- stc_model$coefficients[["(Intercept)"]] + stc_model$coefficients[["X1"]] * trial_BC[ttt == "B", mean(X1)]
-#     estimate_AB <- simulated_A - average_observed_B
-#   }
-#   return(estimate_AB)
-# }
-
-# run_stc <- function(centered_trial_AC, trial_BC, anchored, outcome_regression_model, covariate_names, outcome_family) {
-#   estimate <- stc(centered_trial_AC, trial_BC, anchored, outcome_regression_model, covariate_names, outcome_family)
-#   boot_estimates <- lapply(1:N_BOOT_ITER, \(x) stc(centered_trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
-#                                                    trial_BC[sample(1:.N, .N, replace = TRUE), .SD, by = ttt],
-#                                                    anchored,
-#                                                    outcome_regression_model,
-#                                                    covariate_names,
-#                                                    outcome_family))
-#   variance <- Filter(is.numeric, boot_estimates) |> unlist() |> var()
-#   return(list("estimate" = estimate, "variance" = variance))
-# }
