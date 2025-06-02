@@ -27,7 +27,29 @@ long_df_problems <- lapply(nested_list_results_df, \(l) {
 }) |>
   lapply(rbindlist, idcol = "estimator_num", use.names = TRUE) |>
   lapply(\(df) {df$estimate <- NULL; df$variance <- NULL; return(df)}) |>
-  rbindlist(idcol = "population_parameters_num", use.names = TRUE, fill = TRUE)
+  rbindlist(idcol = "population_parameters_num", use.names = TRUE, fill = TRUE) |>
+  dplyr::mutate(estimator_num = sub(estimator_num, pattern = ".*experiment_results_", replacement = "", perl = TRUE)) |>
+  dplyr::mutate(estimator_num = sub(estimator_num, pattern = "(?<=[0-9])\\.RDS", replacement = "", perl = TRUE) |> as.integer(),
+                adjustment = case_match(adjustment,
+                                        "unadjusted" ~ "Unadjusted",
+                                        "regression" ~ "Regression",
+                                        "iptw" ~ "IPTW"),
+                model = case_match(model,
+                                   "unadjusted" ~ "Unadjusted",
+                                   "glm" ~ "GLM",
+                                   "stc" ~ "STC",
+                                   "ml" ~ "ML",
+                                   "maic_1" ~ "MAIC_1",
+                                   "maic_2" ~ "MAIC_2",
+                                   .default = model),
+                anchored = case_match(anchored,
+                                      "anchored" ~ "Anchored",
+                                      "unanchored" ~ "Unanchored",
+                                      .default = anchored)) |>
+  dplyr::rowwise() |>
+  dplyr::mutate(error_estimate = purrr::pluck(error_estimate, "message", .default = NA)) |>
+  dplyr::ungroup() |>
+  dplyr::rename_with(.fn = stringr::str_to_title)
 
 
 df_true_effects <- list.dirs(dir_experience_results) |>
@@ -180,7 +202,9 @@ long_df_results <- long_df_results |>
 
 joined_results <- df_true_effects[trial == "BC", .(population_parameters_num, outcome_type, true_effect = AB)][long_df_results, , on = c("population_parameters_num", "outcome_type")] |>
   mutate(across(c(population_parameters_num, estimator_num), as.integer)) |>
-  rename_with(stringr::str_to_title)
+  rename_with(stringr::str_to_title) |>
+  tibble::as_tibble() |>
+  dplyr::inner_join(long_df_problems, by = c("Model", "Population_parameters_num", "Anchored", "Estimator_num", "Iteration", "Adjustment"))
 
 
 classification_scenario <- left_join(combined_parameters,
@@ -222,6 +246,9 @@ correct_decision <- function(coef, se, theo) {
 
 df_stats <- joined_results |>
   group_by(Population_parameters_num, Estimator_num, Adjustment, Model, Anchored, Data) |>
+  # Replacing NAs with warnings
+  mutate(Estimate = ifelse(!is.na(Error_estimate), NA, Estimate),
+          Variance = ifelse(!is.na(Error_estimate), NA, Variance)) |>
   summarize(bias = get_bias(Estimate, True_effect ),
             rmse = get_RMSE(Estimate, True_effect ),
             vr = get_VR(Estimate, sqrt(Variance)),
@@ -231,6 +258,8 @@ df_stats <- joined_results |>
             .groups = "drop") |>
   pivot_longer(cols = c("bias", "rmse", "vr", "cov_95", "correct_decision", "number_na_estimate"),
                names_to = "indicator", values_to = "values")
+
+
 
 dir.create(file.path(dir_experience_results, "processed_results"))
 saveRDS(df_stats, file.path(dir_experience_results, "processed_results", "df_stats.rds"))
