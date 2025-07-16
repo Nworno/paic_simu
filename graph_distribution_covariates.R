@@ -127,6 +127,7 @@ for (num_population in scenario_of_interest) {
   print(num_population)
   print(path_results_experiments)
 }
+
 g <- plots_distribution_covariates[[1]] +
   plots_distribution_covariates[[2]] +
   plots_distribution_covariates[[3]] +
@@ -135,10 +136,10 @@ g <- plots_distribution_covariates[[1]] +
   plots_distribution_covariates[[6]] +
   plots_distribution_covariates[[7]] +
   plots_distribution_covariates[[8]] +
-  plot_layout(guides = "collect") &
+  plot_layout(guides = "collect", ncol = 2) &
   theme(legend.position = "bottom") &
   patchwork::plot_annotation(title  = "Covariates (X1 and X2) distributions in a and b trials")
 ggplot2::ggsave(plot = g,
                 filename = file.path(path_experiment, "plots_publication", "all_covariates_distribution.pdf"),
-       width = 10, height = 10)
+       width = 10, height = 15)
 

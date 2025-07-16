@@ -76,6 +76,62 @@ for (population_parameters_num in list_population_parameters) {
          plot = plot_results_DGM)
 }
 
+# Graph with pair of treatments
+pair_list_population_parameters <- list(
+  "1" = c("1", "2"),
+  "2" = c("3", "4"),
+  "3" = c("5", "6"),
+  "4" = c("7", "8")
+)
+for (pair_population_parameters_num in pair_list_population_parameters) {
+
+  df_plot <- df_stats |>
+    dplyr::filter(Population_parameters_num %in% pair_population_parameters_num,
+                  ((Estimator_num == 3 & Anchored == "Unanchored") | (Estimator_num == 1 & Anchored == "Anchored")), # plotting complete models only here
+    ) |>
+    dplyr::filter(!indicator %in% c("correct_decision", "number_na_estimate") &
+                    `Adjustment` %in% c("Unadjusted", "IPTW")) |>
+    dplyr::mutate(
+      objective = ifelse(indicator %in% c("bias", "rmse"), 0,
+                         ifelse(indicator == "vr", 1,
+                                ifelse(indicator == "cov_95", 0.95, NA))),
+      Model = dplyr::case_match(Model,
+                                "MAIC_1" ~ "MAIC-1",
+                                "MAIC_2" ~ "MAIC-2",
+                                "ML" ~ "PSW",
+                                "Unadjusted" ~ "Unadjusted"),
+      indicator = dplyr::case_match(indicator,
+                                    "bias" ~ "Bias",
+                                    "rmse" ~ "RMSE",
+                                    "vr" ~ "VR",
+                                    "cov_95" ~ "95% coverage") |> factor(levels = c("Bias", "RMSE", "VR", "95% coverage"))
+    )
+  if (any(!is.na(df_plot$missing_count))) warning(paste0("Missing values for population_parameters_num: ", pair_population_parameters_num))
+  list_plots <- lapply(pair_population_parameters_num, function(elem) {
+     sub_df_plot <- df_plot |> dplyr::filter(Population_parameters_num == elem)
+      ggplot(sub_df_plot) +
+      facet_wrap(~indicator, scales = "free_x") +
+      geom_point(aes(y = Model, x = values, color = Anchored, shape = Anchored), size = 7, alpha = 0.7) +
+      geom_text(data = dplyr::filter(sub_df_plot, !is.na(missing_count)),
+                aes(x = values, y = Model, label = paste0("*")),
+                vjust = 0, hjust = 0, size = 8, color = "darkred") +
+      scale_shape_manual(breaks = c("Anchored", "Unanchored"), values = c(17, 16)) +
+      geom_vline(aes(xintercept = objective), linetype = "dashed", color = "black") +
+      labs(x = NULL, y = NULL, color = NULL, shape = NULL) +
+      theme_bw() +
+      theme(text = element_text(size = 16),
+            strip.text = element_text(size = 16),
+            plot.caption = element_text(size = 12, hjust = 0)) +
+      labs(title = paste0("DGM-", elem))
+  })
+
+  list_plots[[1]] + list_plots[[2]] +
+    plot_layout(ncol = 1, guides = "collect") &
+    theme(plot.title = element_text(size = 20),
+          legend.position = "bottom",
+            legend.box = "vertical")
+    ggsave(filename = file.path(dir_results, "plots_publication", paste0("performance_estimators_pair", paste(pair_population_parameters_num, collapse = "_"),  ".pdf")),width = 12, height = 15)
+}
 
 
 
