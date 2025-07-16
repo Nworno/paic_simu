@@ -19,7 +19,7 @@ time_start <- Sys.time()
 time_start_string <- format(time_start, "%Y%m%d_%H%M%S")
 print(time_start_string)
 experiment_results_directory <- file.path("results_simulations", time_start_string)
-if (!dir.exists(experiment_results_directory)) dir.create(experiment_results_directory)
+if (!dir.exists(experiment_results_directory)) dir.create(experiment_results_directory, recursive = TRUE)
 saveRDS(df_population_parameters, file.path(experiment_results_directory, "df_population_parameters.RDS"))
 saveRDS(df_estimators_parameters, file.path(experiment_results_directory, "df_estimators_parameters.RDS"))
 for (row_population in 1:nrow(df_population_parameters)) {
