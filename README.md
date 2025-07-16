@@ -8,7 +8,6 @@ Steps to reproduce the results:
 
 ```
 git clone https://github.com/Nworno/paic_simu.git
-cd paic_simu
 ```
 
 ## 2. Run the simulation
