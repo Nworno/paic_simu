@@ -9,10 +9,10 @@ df_stats <- readRDS(file.path(dir_results, "processed_results", "df_stats.rds"))
 
 if (!dir.exists(file.path(dir_results, "plots_publication"))) dir.create(file.path(dir_results, "plots_publication"))
 
-df_estimators_parameters <- readRDS(file.path("~/git_repos/paic_simu/results_simulations/", DATE_EXPERIMENT, "/df_estimators_parameters.RDS")) |>
+df_estimators_parameters <- readRDS(file.path("./results_simulations/", DATE_EXPERIMENT, "/df_estimators_parameters.RDS")) |>
   dplyr::rename(Estimator_num = estimator_num)
 
-df_population_parameters <- readRDS(file.path("~/git_repos/paic_simu/results_simulations/", DATE_EXPERIMENT, "/df_population_parameters.RDS"))
+df_population_parameters <- readRDS(file.path("./results_simulations/", DATE_EXPERIMENT, "/df_population_parameters.RDS"))
 
 na_counts <- df_stats |>
   dplyr::filter(indicator == "number_na_estimate") |>
