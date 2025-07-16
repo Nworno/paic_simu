@@ -5,7 +5,6 @@ library(fontawesome)
 if ("ggthemr" %in% dimnames(installed.packages())[[1]]) ggthemr::ggthemr("fresh")
 source("env_variables.R")
 dir_results <- file.path("results_simulations", DATE_EXPERIMENT)
-print(DATE_EXPERIMENT)
 joined_results <- readRDS(file.path(dir_results, "processed_results", "joined_results.rds"))
 df_stats <- readRDS(file.path(dir_results, "processed_results", "df_stats.rds"))
 

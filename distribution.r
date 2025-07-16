@@ -36,7 +36,7 @@ df_population_parameters <- list(
   outcome_generation_formula =  c(bquote(
     bY_X1*X1 + bY_X2 * X2 + bY_X3 * X3 + bY_X4 * X4 + (bY_A + bY_A_X1*X1 + bY_A_X2*X2 + bY_A_X3*X3 + bY_A_X4*X4) * A +  bY_B*B + bY_C*C
   ))
-)  |> 
+)  |>
   expand.grid() |>
   as.data.table()
 df_population_parameters[, population_parameters_num := 1:.N]
@@ -72,24 +72,22 @@ creating_population <- function(list_simulation_parameters) {
     id = 1:N_pop,
     X1 = eval(f_X1),
     X2 = eval(f_X2),
-    X3 = rlnorm(N_pop, 0.5, 0.5),
-    X4 = binary_marker * rnorm(N_pop, -1.5, 1) + (1 - binary_marker) * rnorm(N_pop, 1.5, 1) # tentative d'une variable bimodale (mais pas utilisé finalement, coef à zéro)
   ) |>
     setkey("id")
-  
-  
+
+
   trial_assignement_prob <- function(trial_assignment_model, df) {
     predicted <- with(df, eval(trial_assignment_model))
     return(plogis(predicted))
   }
-  
+
   predict_outcome <- function(outcome_model, df) {
     with(df, eval(outcome_model))
   }
-  
+
   pop_init[, prob_w_trial_AC := trial_assignement_prob(AC_trial_model, df = pop_init)]
   pop_init[, prob_w_trial_BC := trial_assignement_prob(BC_trial_model, df = pop_init)]
-  
+
   covariate_names <- c("X1", "X2", "X3", "X4")
   df_outcomes <- sapply(list(A = pop_init[, .(A = 1L, B = 0L, C = 0L, (.SD)), .SDcols = covariate_names],
                              B = pop_init[, .(A = 0L, B = 1L, C = 0L, (.SD)), .SDcols = covariate_names],
@@ -101,9 +99,9 @@ creating_population <- function(list_simulation_parameters) {
     as.data.table() |>
     melt(id.vars = c("id"), variable.name = "ttt", value.name = "Y_theo")
   df_outcomes[, Y_obs := Y_theo + rnorm(n = length(Y_theo), mean = 0, sd = 1)]
-  
+
   average_pop_init <- pop_init[, lapply(.SD, mean), .SDcols = covariate_names]
-  
+
   average_conditional_outcome <- sapply(list("A" = average_pop_init[, .(A = 1L, B = 0L, C = 0L, (.SD)), .SDcols = covariate_names],
                                              "B" = average_pop_init[, .(A = 0L, B = 1L, C = 0L, (.SD)), .SDcols = covariate_names],
                                              "C" = average_pop_init[, .(A = 0L, B = 0L, C = 1L, (.SD)), .SDcols = covariate_names]),
@@ -120,24 +118,24 @@ creating_population <- function(list_simulation_parameters) {
     idcol = "outcome_type") |>
     dcast(outcome_type ~ ttt, value.var = "outcome")
   average_outcome_df[, AB := A - B]
-  # population_variance <- df_outcomes[, .(var_Y_obs = var(Y_obs)), by = c("ttt")] |> 
-  #   dcast(. ~ ttt, value.var = "var_Y_obs") |> 
-  #   dplyr::rename(var_population = `.`) |> 
+  # population_variance <- df_outcomes[, .(var_Y_obs = var(Y_obs)), by = c("ttt")] |>
+  #   dcast(. ~ ttt, value.var = "var_Y_obs") |>
+  #   dplyr::rename(var_population = `.`) |>
   #   dplyr::mutate(var_AB = A + B)
-  # 
+  #
   # df_outcomes |> ggplot() + geom_violin(aes(x = Y_obs, y = ttt))
   # diff_AB <- df_outcomes[ttt == "A", Y_obs] - df_outcomes[ttt == "B", Y_obs]
   # mean(diff_AB)
   # mean((diff_AB - mean(diff_AB))^2)
-  # 
+  #
   # average_outcome_df <- merge(average_outcome_df, population_variance, by = "ttt")
   # browser()
-  
+
   # Correcting theoretical marginal effect, so that it is set to 0 when there is actually
   # no difference between theoretical conditional and marginal, as it should be
-  # Useful to quantify estimators alpha and beta nominal risk level 
+  # Useful to quantify estimators alpha and beta nominal risk level
   if (average_outcome_df[outcome_type == "conditional", AB] == 0) average_outcome_df[, AB := 0]
-  
+
   return(list(
     "pop_init" = pop_init,
     "df_outcomes" = df_outcomes,
@@ -183,21 +181,21 @@ for (i in 2:nrow(df_population_parameters)) {
   pop <- creating_population(unlist(df_population_parameters[i, ]))
   pop_init <- pop$pop_init
   df_outcomes <- pop$df_outcomes
-  
+
   selected_individuals_AC <- pop_init[sample(id, N_RCT, replace = FALSE, prob = prob_w_trial_AC)][
     , ttt := rep_len(c("A", "C"), length.out = .N)]
   # selected_outcomes_AC <- df_outcomes[selected_individuals_AC, on = c("id", "ttt")][
   # , c("id", "ttt", "Y_obs")]
   # trial_AC <- pop_init[selected_outcomes_AC, on = "id"][, ttt := factor(ttt, levels = c("C", "A"))]
   trial_AC <- selected_individuals_AC
-  
+
   selected_individuals_BC <- pop_init[sample(id, N_RCT, replace = FALSE, prob = prob_w_trial_BC)][
     , ttt := rep_len(c("B", "C"), length.out = .N)]
   # selected_outcomes_BC <- df_outcomes[selected_individuals_BC, on = c("id", "ttt")][
   # , c("id", "ttt", "Y_obs")]
   # trial_BC <- pop_init[selected_outcomes_BC, on = "id"][, ttt := factor(ttt, levels = c("C", "B"))]
   trial_BC <- selected_individuals_BC
-  
+
   trial_AC$trial <- "AC"
   trial_BC$trial <- "BC"
   tmp <- rbind(trial_AC, trial_BC)
@@ -221,18 +219,18 @@ coolplots <- plots[grepl("rnormbimod\\(", plots) & grepl("bT_X2=-?[1-2]", plots)
 arnaudplots <- plots[(grepl("rnorm\\(", plots) | grepl("rlnorm\\(", plots)) & grepl("bT_X2=0.2", plots)]
 
 print(
-  ggplot(data = trials, aes(x = X2, color = trial)) + 
-    geom_density() + 
+  ggplot(data = trials, aes(x = X2, color = trial)) +
+    geom_density() +
     facet_grid(bT_X2f~f_X2f) +
     geom_vline(data = dummy, aes(xintercept = mean, color = trial)) +
     geom_vline(data = dummy, aes(xintercept = median, color = trial), linetype = "dotted") +
     geom_text(data = dummy, aes(x = x, y = -Inf, label = round(sd, 2)), hjust = -0.1, vjust = -1) +
     coord_cartesian(xlim = c(-5, 5), ylim = c(0, 0.7)) +
     geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf),
-              data = ~ subset(., facet %in% coolplots), 
+              data = ~ subset(., facet %in% coolplots),
               colour = "red", fill = NA, inherit.aes = FALSE) +
     geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf),
-              data = ~ subset(., facet %in% arnaudplots), 
+              data = ~ subset(., facet %in% arnaudplots),
               colour = "blue", fill = NA, inherit.aes = FALSE)
 )
 ggsave("density.pdf", width = 8, height = 10)
@@ -243,10 +241,10 @@ print(
     geom_text(data = dummy, aes(x = x, y = -Inf, label = round(sd, 2)), hjust = -0.1, vjust = -1) +
     coord_cartesian(xlim = c(-5, 5), ylim = c(0, 1000)) +
     geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf),
-              data = ~ subset(., facet %in% coolplots), 
+              data = ~ subset(., facet %in% coolplots),
               colour = "red", fill = NA, inherit.aes = FALSE) +
     geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf),
-              data = ~ subset(., facet %in% arnaudplots), 
+              data = ~ subset(., facet %in% arnaudplots),
               colour = "blue", fill = NA, inherit.aes = FALSE)
 )
 ggsave("histogram.pdf", width = 8, height = 10)

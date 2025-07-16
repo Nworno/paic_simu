@@ -1,3 +1,4 @@
+
 source("env_variables.R")
 weighting_plots_files <- list.files(file.path("results_simulations", DATE_EXPERIMENT),
                                     pattern = c("weighting"),

@@ -70,7 +70,7 @@ df_population_parameters <- readRDS(file = file.path(dir_experience_results, "df
 df_estimators_parameters <- readRDS(file = file.path(dir_experience_results, "df_estimators_parameters.RDS"))
 
 long_df_results <- long_df_results |>
-  mutate(data = case_match(model,
+  dplyr::mutate(data = case_match(model,
                            c("maic_1", "maic_2", "stc") ~ "PAIC",
                            c("ml", "glm") ~ "IPD",
                            "unadjusted" ~ "AgD") |> factor(levels = c("AgD", "PAIC", "IPD")),
@@ -81,9 +81,9 @@ long_df_results <- long_df_results |>
          adjustment = ifelse(adjustment == "iptw", "IPTW", stringr::str_to_title(adjustment)),
          model = ifelse(model == "unadjusted", "Unadjusted", toupper(model)))
 
-joined_results <- df_true_effects[trial == "BC", .(population_parameters_num, outcome_type, true_effect = AB)][long_df_results, , on = c("population_parameters_num", "outcome_type")] |>
-  mutate(across(c(population_parameters_num, estimator_num), as.integer)) |>
-  rename_with(stringr::str_to_title) |>
+joined_results <- df_true_effects[trial == "BC", .(population_parameters_num = as.integer(population_parameters_num), outcome_type, true_effect = AB)][long_df_results, , on = c("population_parameters_num", "outcome_type")] |>
+  dplyr::mutate(estimator_num = as.integer(estimator_num)) |>
+  dplyr::rename_with(stringr::str_to_title) |>
   tibble::as_tibble() |>
   dplyr::inner_join(long_df_problems, by = c("Model", "Population_parameters_num", "Anchored", "Estimator_num", "Iteration", "Adjustment"))
 

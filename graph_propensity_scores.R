@@ -44,12 +44,10 @@ for (config in 1:2) {
                                                     "unweighted" ~ "Unweighted") |>
                       factor(levels = c("Unweighted", "PSW", "MAIC-1", "MAIC-2")))
     if (length(var) > 1)  {
-      print("oh")
       base_plot <- tidyr::pivot_longer(base_plot, cols = all_of(var), names_to = "X_name", values_to = "X_value")
       var_col <- "X_value"
       alpha_points <- 50000/nrow(base_plot)
     } else {
-      print("yeah")
       var_col <- var
       alpha_points <- 10000/nrow(base_plot)
     }

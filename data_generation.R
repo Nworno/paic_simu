@@ -139,9 +139,7 @@ creating_population <- function(list_simulation_parameters, N_pop) {
   pop_init <- data.table(
     id = 1:N_pop,
     X1 = eval(f_X1),
-    X2 = eval(f_X2),
-    X3 = eval(f_X3),
-    X4 = eval(f_X4)
+    X2 = eval(f_X2)
   ) |>
     setkey("id")
 
@@ -166,7 +164,7 @@ creating_population <- function(list_simulation_parameters, N_pop) {
     with(df, eval(outcome_model))
   }
 
-  covariate_names <- c("X1", "X2", "X3", "X4")
+  covariate_names <- c("X1", "X2")
 
   df_outcomes_pop_init <- sapply(list(A = pop_init[, .(A = 1L, B = 0L, C = 0L, (.SD)), .SDcols = covariate_names],
                                       B = pop_init[, .(A = 0L, B = 1L, C = 0L, (.SD)), .SDcols = covariate_names],
@@ -475,8 +473,6 @@ struct_results <- list(
 list_covariate_names <- c(
   combn(c("X1", "X2"), m = 1, simplify = FALSE),
   combn(c("X1", "X2"), m = 2, simplify = FALSE)
-  # combn(c("X1", "X2", "X3", "X4"), m = 3, simplify = FALSE),
-  # combn(c("X1", "X2", "X3", "X4"), m = 4, simplify = FALSE)
 ) |> as.vector()
 
 quadratic = TRUE
