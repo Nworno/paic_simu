@@ -1,7 +1,6 @@
 library(ggplot2)
 library(magrittr, include.only = "%$%")
 library(patchwork)
-library(fontawesome)
 if ("ggthemr" %in% dimnames(installed.packages())[[1]]) ggthemr::ggthemr("fresh")
 source("env_variables.R")
 dir_results <- file.path("results_simulations", DATE_EXPERIMENT)
