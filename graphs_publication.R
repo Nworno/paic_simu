@@ -4,8 +4,6 @@ library(patchwork)
 library(fontawesome)
 if ("ggthemr" %in% dimnames(installed.packages())[[1]]) ggthemr::ggthemr("fresh")
 source("env_variables.R")
-# DATE_EXPERIMENT <- "20241016_184147" # Results simulations
-# DATE_EXPERIMENT <- "20250401_161025" # Propensity score distribution
 dir_results <- file.path("results_simulations", DATE_EXPERIMENT)
 print(DATE_EXPERIMENT)
 joined_results <- readRDS(file.path(dir_results, "processed_results", "joined_results.rds"))
@@ -31,7 +29,6 @@ df_stats <- df_stats |>
 
 list_population_parameters <- as.character(1:8)
 
-# Treatment effect, only weighting methods, only complete models --------
 for (population_parameters_num in list_population_parameters) {
 
   df_plot <- df_stats |>
@@ -132,7 +129,6 @@ for (pair_population_parameters_num in pair_list_population_parameters) {
             legend.box = "vertical")
     ggsave(filename = file.path(dir_results, "plots_publication", paste0("performance_estimators_pair", paste(pair_population_parameters_num, collapse = "_"),  ".pdf")),width = 12, height = 15)
 }
-
 
 
 # Plots exploring confounding with missing variables --------

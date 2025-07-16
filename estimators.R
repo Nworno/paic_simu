@@ -34,7 +34,6 @@ unadjusted_estimator <- function(trial_AC,
   return(list("estimate" = naive_AB, "variance" = var_AB))
 }
 
-# (Unanchored) unadjusted observed effect in pop_init
 run_unadjusted_estimator <- function(trial_AC, trial_BC, anchored, glm_family) {
   result <- unadjusted_estimator(trial_AC, trial_BC, anchored, glm_family)
   return(list("estimate" = result$estimate, "variance" = result$variance))
@@ -45,7 +44,6 @@ run_unadjusted_estimator <- function(trial_AC, trial_BC, anchored, glm_family) {
 ########## PROPENSITY SCORE
 ###########################
 
-#### Estimating wegihts with maximum likelihood logistic regression (propensity score)
 max_likelihood <- function(df, model, dependent_variable) {
   PS_BC_trial <- glm(model, df, family = binomial(link = "logit"))$fitted.values
   ATC_w <- (df[[dependent_variable]] %in% "BC") + (df[[dependent_variable]] == "AC") * PS_BC_trial / (1 - PS_BC_trial)
@@ -165,14 +163,7 @@ propensity_score <- function(trial_AC,
   }
     df[, trial_weights := trial_weights]
 
-  # ALl estimated in one step, but similar as doing it in two steps when not adjusted on any confoundings. The "anchored" comparison is performed by the " + trial" in the model
-  # fitted_glm <- glm(outcome_model,
-  #                   family = outcome_family,
-  #                   data = df,
-  #                   weights = trial_weights)
-
   tryCatch.W.E <- function(expr) {
-    # taken from demo(error.catching)
     W <- NULL
     w.handler <- function(w) { # warning handler
       W <<- w
@@ -189,13 +180,9 @@ propensity_score <- function(trial_AC,
     fitted_glm$coefficients[["tttA"]]
   })
 
-  # variance
 
-  # These two variances effectively only count one arm in the case of unanchored comparisons
   variance_BC <- df[trial == "BC", .(var = var(Y_obs)/.N), by = ttt][, var] |> sum()
-  #TODO: reprendre d'ici, récupérer erreur quand problème avec la variance pondérée : peut être récupérer simplement le nombre de NA
   variance_AC <- df[trial == "AC"][, .(var = weighted.var(Y_obs, trial_weights)/sum(trial_weights)), by = ttt][, var] |> sum()
-  # Estimate AC
   estimate_A_and_C <- df[trial == "AC"][, .(mean = weighted.mean(Y_obs, trial_weights)), by = ttt]
   if (anchored) estimate_AC <- estimate_A_and_C[ttt == "A", mean] - estimate_A_and_C[ttt == "C", mean] else estimate_AC <- estimate_A_and_C[ttt == "A", mean]
   return(list(estimate_AB = estimate_AB, estimate_AC = estimate_AC, variance_AC = variance_AC, variance_BC = variance_BC, df = df))
@@ -212,7 +199,6 @@ run_propensity_score <- function(trial_AC, trial_BC, covariate_names, assignment
                               are_binary_covariates)
   estimate_AB <- results$estimate_AB
   variance_BC <- results$variance_BC
-  # variance_AC <- results$variance_AC
   boot_estimates <- lapply(1:N_BOOT_ITER, \(x) propensity_score(trial_AC[sample(1:.N, .N, replace = TRUE), .SD, by = c("ttt")],
                                                                 trial_BC,
                                                                 covariate_names,
@@ -234,15 +220,12 @@ run_propensity_score <- function(trial_AC, trial_BC, covariate_names, assignment
   boot_errors <- sapply(boot_estimates[!is.finite(boot_estimates_AC)], \(x) x$df, simplify = FALSE)
   boot_warnings <- sapply(boot_estimates[!is.finite(boot_estimates_AC)], \(x) x$estimate_AC, simplify = FALSE)
 
-  # variance_AC <- Filter(is.numeric, boot_estimates_AC) |> unlist() |> var()
   variance_AC <- tryCatch(Filter(\(x) is.finite(x), boot_estimates_AC) |> var(),
                           error = function(e) {print("no valid estimation for AC variance"); return(NA)})
 
 
   variance_AB <- variance_BC + variance_AC # works only on a linear scale, so estimate output has to remain linear
   list_ps_results <- list("estimate" = estimate_AB$value, "variance" = variance_AB, "error_estimate" = error_estimate)
-  # if (length(boot_errors) > 0) list_ps_results$boot_errors <- boot_errors
-  # if (length(boot_errors) > 0) list_ps_results$boot_warnings <- boot_warnings
   if (retrieve_ps_weights) list_ps_results$df <- results$df
   return(list_ps_results)
 }
@@ -258,14 +241,10 @@ regression_model <- function(trial_AC,
                              full_ipd,
                              outcome_family) {
     if (full_ipd) {
-      # Classic IPD -->
-      ### Classic regression model
       df_full_ipd <- data.table::rbindlist(list(trial_AC, trial_BC),
                                            fill = TRUE,
                                            use.names = TRUE)
       if (anchored) {
-        # 2 differences between anchored/unanchored:
-        # "two times" more data to estimate predictors' effect + 'trial' variable in the model
         predictors_model <- paste0(predictors_model, " + trial")
       } else {
         df_full_ipd <- df_full_ipd[ttt %in% c("A", "B"), ]
@@ -288,7 +267,6 @@ regression_model <- function(trial_AC,
       }
       estimate_AB <- fitted_model$coefficients[["tttA"]]
       variance_AB <- vcov(fitted_model)["tttA", "tttA"]
-
 
     } else {
       #### STC

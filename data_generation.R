@@ -11,34 +11,21 @@ df_default_parameters <- list(
   bT_X2 = 1,   # Effet de la variable continue X2...
   bT2_X2 = -0.5,   # Effet de la variable continue X2...
   fbT = 1,
-  bT_X3 = 0,
-  bT_X4 = 0,
-  bT2_X3 = 0,
-  bT2_X4 = 0,
   bY_X1 = 1,   # Effet de X1 sur l'outcome
   bY_X2 = 2,   # Effet de X2 sur l'outcome
-  bY_X3 = 0,     # Effet de X3 sur l'outcome
-  bY_X4 = 0,     # Effet de X4 sur l'outcome
   bY_A_X1 = c(2), # Interaction A et X1 dans le modèle outcome
   bY_A_X2 = c(0), # Interaction A et X2 dans le modèle outcome
-  bY_A_X3 = c(0), # Interaction A et X3 dans le modèle outcome
-  bY_A_X4 = c(0), # Interaction A et X4 dans le modèle outcome
   bY_B_X1 = c(0), # Interaction A et X1 dans le modèle outcome
   bY_B_X2 = c(0), # Interaction A et X2 dans le modèle outcome
-  bY_B_X3 = c(0), # Interaction A et X3 dans le modèle outcome
-  bY_B_X4 = c(0), # Interaction A et X4 dans le modèle outcome
-  # binary_marker = c(bquote(rbinom(N_pop, 1, 0.5))), # Utilisé pour la variable bimodale : introduit corrélation entre les variables, car le marker est le même pour tous les individus
   f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1.5))))),
   f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1.5))))),
-  f_X3 = c(bquote(0)),
-  f_X4 = c(bquote(0)),
   bY_A = 1,  # Effet de A par rapport à C
   bY_B = 1,  # Effet de B par rapport à C
   bY_C = 0,    # Pas d'effet de C sur l'outcome
-  BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2 + bT_X3 * X3 + bT2_X3 * X3^2 + bT_X4 * X4 + bT2_X4 * X4^2)), # Modèle d'attribution de l'essai BC
+  BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2)), # Modèle d'attribution de l'essai BC
   outcome_distribution = c("normal"),
   outcome_generation_formula =  c(bquote(
-    bY_X1*X1 + bY_X2 * X2 + bY_X3 * X3 + bY_X4 * X4 + (bY_A + bY_A_X1*X1 + bY_A_X2*X2 + bY_A_X3*X3 + bY_A_X4*X4) * A +  (bY_B + bY_B_X1*X1 + bY_B_X2*X2 + bY_B_X3*X3 + bY_B_X4*X4) *B + bY_C*C
+    bY_X1*X1 + bY_X2 * X2 + (bY_A + bY_A_X1*X1 + bY_A_X2*X2) * A +  (bY_B + bY_B_X1*X1 + bY_B_X2*X2) *B + bY_C*C
   ))
 )
 
@@ -141,12 +128,9 @@ df_population_parameters[, population_parameters_num := 1:.N]
 ########### Creating an overarching population
 ##############################################
 
-## Génère une data.frame de 10^6 ou 7 lignes
 creating_population <- function(list_simulation_parameters, N_pop) {
   attach(list_simulation_parameters)
-
   # Modifying the coefficient values using fbT
-
   bT_X1 <- bT_X1*fbT
   bT2_X1 <- bT2_X1*fbT
   bT_X2 <- bT_X2*fbT
@@ -162,7 +146,6 @@ creating_population <- function(list_simulation_parameters, N_pop) {
     setkey("id")
 
   # Finding out bT value which provides balanced probabilities
-
   bT = 0
   qPtrial <- with(pop_init, eval(BC_trial_model))
   fct <- function(x, qP, prev) {
@@ -172,9 +155,7 @@ creating_population <- function(list_simulation_parameters, N_pop) {
     bT <- uniroot(fct, interval = c(mean(qPtrial) - 100, mean(qPtrial) + 100), qP = qPtrial, prev = 0.5)$root
   }, error = function(e) {
     print("Error in uniroot")
-    browser()
   })
-
 
   trial_assignement_prob <- function(trial_assignment_model, df) {
     predicted <- with(df, eval(trial_assignment_model))
@@ -201,13 +182,13 @@ creating_population <- function(list_simulation_parameters, N_pop) {
   if (outcome_distribution == "normal") {
     df_outcomes_pop_init[, Y_obs := Y_theo + rnorm(n = .N, mean = 0, sd = 1)]
   } else if (outcome_distribution == "binomial") {
-    df_outcomes_pop_init[, Y_obs := rbinom(n = .N, size = 1, prob = plogis(Y_theo))] # equivalent to ifelse(rnorm(.N, 0, pi/sqrt(3)) > 0, 1, 0) bc of the variance of the logistic function, thus normal and binomial outcome distributions are not interchangeable using plogis and 1/(1 + exp(-x))
+    df_outcomes_pop_init[, Y_obs := rbinom(n = .N, size = 1, prob = plogis(Y_theo))]
     moy_outcomes <- tapply(df_outcomes_pop_init$Y_obs, df_outcomes_pop_init$ttt, mean, simplify = FALSE)
-    if (any(moy_outcomes < 0.02 | moy_outcomes > 0.98)) { # arbitrary thresholds, to avoid downstreams problem with model fitting
+    if (any(moy_outcomes < 0.02 | moy_outcomes > 0.98)) { # arbitrary thresholds, to avoid downstream problems
       stop("Too extreme outcomes")
     }
   } else {
-    stop("Unknown outcome distribution")
+    stop("Wrong outcome_distribution parameter value")
   }
 
 
@@ -221,7 +202,7 @@ creating_population <- function(list_simulation_parameters, N_pop) {
   if (any(table(pop_init$trial)/N_RCT < 5)) stop("One of the trial's superpopulation size is less than 5 times the sample size per trial") # warning if propensity scores too extreme
   if (any(table(pop_init$trial)/N_RCT < 10)) warning("One of the trial's superpopulation size is less than 10 times the sample size per trial") # warning if propensity scores too extreme
 
-  pop_BC <- pop_init[trial == "BC"][, ttt := rep_len(c("C", "B"), length.out = .N)] # 06/05/25 : no duplication of patients anymore: with a large enough general population and a not too imbalanced population, should be fine
+  pop_BC <- pop_init[trial == "BC"][, ttt := rep_len(c("C", "B"), length.out = .N)]
   pop_AC <- pop_init[trial == "AC"][, ttt := rep_len(c("C", "A"), length.out = .N)]
 
   all_individuals <- data.table::rbindlist(list(pop_BC, pop_AC), use.names = TRUE)
@@ -237,11 +218,11 @@ creating_population <- function(list_simulation_parameters, N_pop) {
     c("trial" = list(average_all_individuals$trial)) |>
     as.data.table() |>
     melt(measure.vars = c("A", "B", "C"), variable.name = "ttt", value.name = "outcome")
-  # if (outcome_distribution == "binomial") average_conditional_outcome_all_individuals[, outcome :=  plogis(outcome)]
 
   marginal_outcome_all_individuals <- all_individuals[, lapply(.SD, mean), .SDcols = c("A", "B", "C"), by = c("trial")] |>
     data.table::melt(id.vars = "trial", measure.vars = c("A", "B", "C"), value.name = "outcome", variable.name = "ttt")
-  if (outcome_distribution == "binomial") marginal_outcome_all_individuals <- marginal_outcome_all_individuals[ ,.(trial, ttt, outcome  = log(outcome/(1 - outcome)))] # setting back to linear scale to be able to estimate AB as A - B
+  # setting back to linear scale to be able to estimate AB as A - B
+  if (outcome_distribution == "binomial") marginal_outcome_all_individuals <- marginal_outcome_all_individuals[ ,.(trial, ttt, outcome  = log(outcome/(1 - outcome)))]
 
   average_outcome_df <- rbindlist(
     list("conditional" = average_conditional_outcome_all_individuals,
@@ -250,23 +231,6 @@ creating_population <- function(list_simulation_parameters, N_pop) {
     idcol = "outcome_type") |>
     dcast(trial + outcome_type ~ ttt, value.var = "outcome")
   average_outcome_df[, AB := A - B] # linear scale
-
-  # population_variance <- df_outcomes[, .(var_Y_obs = var(Y_obs)), by = c("ttt")] |>
-  #   dcast(. ~ ttt, value.var = "var_Y_obs") |>
-  #   dplyr::rename(var_population = `.`) |>
-  #   dplyr::mutate(var_AB = A + B)
-  #
-  # df_outcomes |> ggplot() + geom_violin(aes(x = Y_obs, y = ttt))
-  # diff_AB <- df_outcomes[ttt == "A", Y_obs] - df_outcomes[ttt == "B", Y_obs]
-  # mean(diff_AB)
-  # mean((diff_AB - mean(diff_AB))^2)
-  #
-  # average_outcome_df <- merge(average_outcome_df, population_variance, by = "ttt")
-
-  # Correcting theoretical marginal effect, so that it is set to 0 when there is actually
-  # no difference between theoretical conditional and marginal, as it should be
-  # Useful to quantify estimators alpha and beta nominal risk level
-  # if (average_outcome_df[outcome_type == "conditional", AB] == 0) average_outcome_df[, AB := 0]
 
   detach(list_simulation_parameters)
   return(list(
@@ -308,6 +272,7 @@ indirect_comparisons <- function(pop_init,
                        binomial = binomial(link = "logit"))
 
   stopifnot(names(trial_AC) == names(trial_BC))
+
   ###############################
   ########## Unadjusted estimator
   ###############################
@@ -378,7 +343,7 @@ indirect_comparisons <- function(pop_init,
                                                               outcome_family = glm_family,
                                                               are_binary_covariates = are_binary_covariates)
   ##################
-  ### MAIC Moments 1
+  ### MAIC Moments 2
   ##################
   struct_results$iptw$anchored$maic_2 <- run_propensity_score(trial_AC,
                                                             trial_BC,
@@ -506,10 +471,6 @@ struct_results <- list(
   )
 )
 
-###############
-#### ESTIMATORS
-###############
-
 # Used to specify variables to use for "trial exposure" models, and unanchored STC
 list_covariate_names <- c(
   combn(c("X1", "X2"), m = 1, simplify = FALSE),
@@ -538,16 +499,3 @@ df_estimators_parameters <- data.table(
   "outcome_regression_model" = list_outcome_regression_models
 )
 df_estimators_parameters[, estimator_num := 1:.N]
-
-
-# Intermediate data frame used for creating all combinations of
-# combination_experiments <- expand.grid(
-#   "estimator_num" = df_estimators_parameters$estimator_num,
-#   "population_parameters_num" = df_population_parameters$population_parameters_num
-# ) |> as.data.table()
-#
-# df_experiments <- combination_experiments[df_population_parameters, , on = "population_parameters_num"][
-#   df_estimators_parameters, , on = "estimator_num"
-# ]
-
-

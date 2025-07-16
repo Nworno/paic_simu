@@ -1,7 +1,8 @@
-Faire tourner successivement 
+# Reproducing results from "Assessing the Impact of Covariate Distribution and Positivity Violation on Weighting-Based Indirect Comparisons: a Simulation Study" 
 
-1. run_simulations.R --> les résultats s'enregistrent dans results/simulationss/yyyymmdd_hhmmss
-2. processing_results.R, après avoir modifié la variable DATE_EXPERIMENT dans env_variables.R
+This repo allows to reproduce the results presented in the article: "Assessing the Impact of Covariate Distribution and Positivity Violation on Weighting-Based Indirect Comparisons: a Simulation Study, Serret-Larmande et al., 2025, DOI: xxx/xxxx". The source code is written in R version 4.5.1.
 
-
-
+Steps to reproduce the results:
+- With a working installation of renv, set up your R environment with 
+- Source the `run_simulations.R` file, after adjusting the `options(mc.cores = N)` depending on your hardware
+- The outut will be written in `results_simulations/yyyymmdd_hhmmss/`. 

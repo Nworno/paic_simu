@@ -9,6 +9,7 @@ source("data_generation.R")
 N_pop <- 2*10^6
 N_BOOT_ITER <- 2000
 n_iter <- 2000
+retrieve_ps_weights <- TRUE
 
 
 ###############
@@ -22,7 +23,6 @@ if (!dir.exists(experiment_results_directory)) dir.create(experiment_results_dir
 saveRDS(df_population_parameters, file.path(experiment_results_directory, "df_population_parameters.RDS"))
 saveRDS(df_estimators_parameters, file.path(experiment_results_directory, "df_estimators_parameters.RDS"))
 for (row_population in 1:nrow(df_population_parameters)) {
-# for (row_population in 5) {
   dir_sub_experiment <- file.path(experiment_results_directory, row_population)
   dir.create(dir_sub_experiment)
   list_simulation_parameters <- df_population_parameters[row_population, ] |> unlist()
@@ -35,10 +35,7 @@ for (row_population in 1:nrow(df_population_parameters)) {
   print(Sys.time())
 
   saveRDS(population$average_outcome_df, file.path(dir_sub_experiment, "average_outcome_df.RDS"))
-  # Commented because huge file, so would take could much space if saved for every try
-  # saveRDS(pop_init, file.path(dir_sub_experiment, "pop_init.RDS"))
 
-  retrieve_ps_weights <- TRUE
   for (row_estimators in 1:nrow(df_estimators_parameters)) {
     list_estimators_parameters <- df_estimators_parameters[row_estimators, ] |> unlist(recursive = FALSE)
     results_simulations <- parallel::mclapply(1:n_iter, \(i) {

@@ -1,7 +1,5 @@
 library(ggplot2)
 if ("ggthemr" %in% dimnames(installed.packages())[[1]]) ggthemr::ggthemr("flat")
-# theme_update(plot.background = element_blank())
-# theme_update(panel.background = element_blank())
 
 ###################################
 ## Drawing distributions covariates
@@ -47,9 +45,6 @@ for (num_population in scenario_of_interest) {
     ggplot() +
     geom_density(aes(prob_BC, fill = trial), alpha = 0.3) +
     labs(x = NULL, y = NULL, title = "Propensity distributions")
-  # saveRDS(plot_propensity_distribution, file.path(path_results_experiments, "propensity_distribution.RDS"))
-  # ggsave(file.path(path_results_experiments, "propensity_distribution.png"),
-  #        plot = plot_propensity_distribution, width = 10, height = 5)
 
   plot_covariates_distribution <- all_individuals |>
     ggplot() +
@@ -79,8 +74,6 @@ for (num_population in scenario_of_interest) {
 
   df_outcome <- readRDS(file.path(path_results_experiments, "average_outcome_df.RDS"))
   if (list_simulation_parameters$outcome_distribution == "normal") {
-
-    # Rajouter tableau df_outcome
 
     plot_outcome_distribution <- all_individuals |>
       ggplot() +
