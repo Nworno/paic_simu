@@ -16,6 +16,7 @@ From an R console, restore the adequate package versions using the `renv` packag
 
 ```
 install.packages("renv")
+renv::activate()
 renv::restore()
 ```
 
