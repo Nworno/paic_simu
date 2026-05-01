@@ -116,12 +116,6 @@ propensity_score <- function(trial_AC,
     } else {
       stop("No weight estimation method provided")
     }
-    if (outcome_family$family == "binomial") {
-      df$y_0 <- 1 - df$Y_obs
-      outcome_model <- as.formula(cbind(Y_obs, y_0) ~ ttt + trial)
-    } else {
-      outcome_model <- as.formula(Y_obs ~ ttt + trial)
-    }
   } else {
     ######## Non-anchored
     trial_A <- trial_AC[ttt == "A"]
@@ -174,17 +168,57 @@ propensity_score <- function(trial_AC,
          warning = W)
   }
 
-  estimate_AB <- tryCatch.W.E({
-    design_glm <- survey::svydesign(id=~1, weights =~trial_weights, data = df)
-    fitted_glm <- survey::svyglm(outcome_model, design = design_glm, family = outcome_family)
-    fitted_glm$coefficients[["tttA"]]
-  })
-
-
-  variance_BC <- df[trial == "BC", .(var = var(Y_obs)/.N), by = ttt][, var] |> sum()
-  variance_AC <- df[trial == "AC"][, .(var = weighted.var(Y_obs, trial_weights)/sum(trial_weights)), by = ttt][, var] |> sum()
-  estimate_A_and_C <- df[trial == "AC"][, .(mean = weighted.mean(Y_obs, trial_weights)), by = ttt]
-  if (anchored) estimate_AC <- estimate_A_and_C[ttt == "A", mean] - estimate_A_and_C[ttt == "C", mean] else estimate_AC <- estimate_A_and_C[ttt == "A", mean]
+  if (anchored) {
+    # Two-step approach: separate weighted AC model and unweighted BC model.
+    # Avoids conditioning on `trial` in a logistic model, which would estimate
+    # a conditional OR (non-collapsible) rather than the targeted marginal OR.
+    df_AC <- df[trial == "AC"]
+    df_BC <- df[trial == "BC"]
+    df_AC[, ttt := relevel(as.factor(ttt), ref = "C")]
+    df_BC[, ttt := relevel(as.factor(ttt), ref = "C")]
+    if (outcome_family$family == "binomial") {
+      df_AC$y_0 <- 1 - df_AC$Y_obs
+      df_BC$y_0 <- 1 - df_BC$Y_obs
+      outcome_model_step <- as.formula(cbind(Y_obs, y_0) ~ ttt)
+    } else {
+      outcome_model_step <- as.formula(Y_obs ~ ttt)
+    }
+    design_AC <- survey::svydesign(id = ~1, weights = ~trial_weights, data = df_AC)
+    fitted_BC_glm <- tryCatch(
+      glm(outcome_model_step, data = df_BC, family = outcome_family),
+      error = function(e) NULL
+    )
+    result_step <- tryCatch.W.E({
+      fitted_AC <- survey::svyglm(outcome_model_step, design = design_AC, family = outcome_family)
+      coef_AC <- fitted_AC$coefficients[["tttA"]]
+      coef_BC <- if (!is.null(fitted_BC_glm)) fitted_BC_glm$coefficients[["tttB"]] else stop("BC model failed")
+      list(AB = coef_AC - coef_BC, AC = coef_AC)
+    })
+    step_succeeded <- !inherits(result_step$value, "error")
+    estimate_AC <- if (step_succeeded) result_step$value$AC else NA_real_
+    estimate_AB <- list(
+      value   = if (step_succeeded) result_step$value$AB else result_step$value,
+      warning = result_step$warning
+    )
+    variance_BC <- if (outcome_family$family == "binomial") {
+      # log-odds scale: use model-based variance to match the estimate scale
+      if (!is.null(fitted_BC_glm))
+        tryCatch(vcov(fitted_BC_glm)["tttB", "tttB"], error = function(e) NA_real_)
+      else NA_real_
+    } else {
+      df_BC[, .(var = var(Y_obs) / .N), by = ttt][, var] |> sum()
+    }
+    variance_AC <- NA_real_   # computed via bootstrap in run_propensity_score
+  } else {
+    estimate_AB <- tryCatch.W.E({
+      design_glm <- survey::svydesign(id=~1, weights =~trial_weights, data = df)
+      fitted_glm <- survey::svyglm(outcome_model, design = design_glm, family = outcome_family)
+      fitted_glm$coefficients[["tttA"]]
+    })
+    variance_BC <- df[trial == "BC", .(var = var(Y_obs)/.N), by = ttt][, var] |> sum()
+    variance_AC <- df[trial == "AC"][, .(var = weighted.var(Y_obs, trial_weights)/sum(trial_weights)), by = ttt][, var] |> sum()
+    estimate_AC <- df[trial == "AC"][, .(mean = weighted.mean(Y_obs, trial_weights)), by = ttt][ttt == "A", mean]
+  }
   return(list(estimate_AB = estimate_AB, estimate_AC = estimate_AC, variance_AC = variance_AC, variance_BC = variance_BC, df = df))
 }
 

@@ -11,105 +11,137 @@ df_default_parameters <- list(
   bT_X2 = 1,   # Effet de la variable continue X2...
   bT2_X2 = -0.5,   # Effet de la variable continue X2...
   fbT = 1,
+  f_X1 = bquote(stop("f_X1 must be specified for each scenario")),
+  f_X2 = bquote(stop("f_X2 must be specified for each scenario")),
   bY_X1 = 1,   # Effet de X1 sur l'outcome
   bY_X2 = 2,   # Effet de X2 sur l'outcome
   bY_A_X1 = c(2), # Interaction A et X1 dans le modèle outcome
+  bY_A_X1_2 = c(0), # Interaction quadratique A et X1 dans le modèle outcome
   bY_A_X2 = c(0), # Interaction A et X2 dans le modèle outcome
   bY_B_X1 = c(0), # Interaction A et X1 dans le modèle outcome
   bY_B_X2 = c(0), # Interaction A et X2 dans le modèle outcome
-  f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1.5))))),
-  f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1.5))))),
   bY_A = 1,  # Effet de A par rapport à C
   bY_B = 1,  # Effet de B par rapport à C
   bY_C = 0,    # Pas d'effet de C sur l'outcome
   BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2)), # Modèle d'attribution de l'essai BC
   outcome_distribution = c("normal"),
   outcome_generation_formula =  c(bquote(
-    bY_X1*X1 + bY_X2 * X2 + (bY_A + bY_A_X1*X1 + bY_A_X2*X2) * A +  (bY_B + bY_B_X1*X1 + bY_B_X2*X2) *B + bY_C*C
+    bY_X1*X1 + bY_X2 * X2 + (bY_A + bY_A_X1*X1 + bY_A_X1_2*X1^2 + bY_A_X2*X2) * A +  (bY_B + bY_B_X1*X1 + bY_B_X2*X2) *B + bY_C*C
   ))
 )
 
 
 list_changing_parameters <- list(
-  "1" = list(
+  # "1" = list(
+  #   f_X1 = c(bquote(rnorm(N_pop, 0, 1))),
+  #   f_X2 = c(bquote(rnorm(N_pop, 0, 1))),
+  #   bT_X1 = 1,
+  #   bT2_X1 = -0.5,
+  #   bT_X2 = 1,
+  #   bT2_X2 = -0.5,
+  #   fbT = 1,
+  #   BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
+  # ),
+  # "2" = list(
+  #   f_X1 = c(bquote(rnorm(N_pop, 0, 1))),
+  #   f_X2 = c(bquote(rnorm(N_pop, 0, 1))),
+  #   bT_X1 = 1,
+  #   bT2_X1 = -0.5,
+  #   bT_X2 = 1,
+  #   bT2_X2 = -0.5,
+  #   fbT = -1,
+  #   BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
+  #   ),
+  # "3" = list(
+  #   f_X1 = c(bquote(pmin(rlnorm(N_pop, 0, 0.5), 5))),
+  #   f_X2 = c(bquote(pmin(rlnorm(N_pop, 0, 0.5), 5))),
+  #   bT_X1 = 2,
+  #   bT2_X1 = 0,
+  #   bT_X2 = 2,
+  #   bT2_X2 = 0,
+  #   fbT = -1,
+  #   BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
+  # ),
+  # "4" = list(
+  #   f_X1 = c(bquote(pmin(rlnorm(N_pop, 0, 0.5), 5))),
+  #   f_X2 = c(bquote(pmin(rlnorm(N_pop, 0, 0.5), 5))),
+  #   bT_X1 = 2,
+  #   bT2_X1 = 0,
+  #   bT_X2 = 2,
+  #   bT2_X2 = 0,
+  #   fbT = 1,
+  #   BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
+  # ),
+  # "5" = list(
+  #   f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
+  #   f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
+  #   bT_X1 = 1,
+  #   bT2_X1 = -1,
+  #   bT_X2 = 1,
+  #   bT2_X2 = -1,
+  #   fbT = 0.5,
+  #   BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
+  # ),
+  # "6" = list(
+  #   f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
+  #   f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
+  #   bT_X1 = 1,
+  #   bT2_X1 = -1,
+  #   bT_X2 = 1,
+  #   bT2_X2 = -1,
+  #   fbT = -0.5,
+  #   BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
+  # ),
+  # "7" = list(
+  #   f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
+  #   f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
+  #   bT_X1 = 1,
+  #   bT2_X1 = -1,
+  #   bT_X2 = 1,
+  #   bT2_X2 = -1,
+  #   fbT = 0.5,
+  #   BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
+  # ),
+  # "8" = list(
+  #   f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
+  #   f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
+  #   bT_X1 = 1,
+  #   bT2_X1 = -1,
+  #   bT_X2 = 1,
+  #   bT2_X2 = -1,
+  #   fbT = -0.5,
+  #   BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
+  # ),
+
+  # DGM-9 : interaction quadratique dans l'essai AC - bon overlap
+  "9" = list(
     f_X1 = c(bquote(rnorm(N_pop, 0, 1))),
     f_X2 = c(bquote(rnorm(N_pop, 0, 1))),
-    bT_X1 = 1,
-    bT2_X1 = -0.5,
-    bT_X2 = 1,
-    bT2_X2 = -0.5,
-    fbT = 1,
-    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
+    bY_A_X1_2 = 1
   ),
-  "2" = list(
+
+  # DGM-10 : interaction quadratique dans l'essai AC - mauvais overlap
+  "10" = list(
     f_X1 = c(bquote(rnorm(N_pop, 0, 1))),
     f_X2 = c(bquote(rnorm(N_pop, 0, 1))),
-    bT_X1 = 1,
-    bT2_X1 = -0.5,
-    bT_X2 = 1,
-    bT2_X2 = -0.5,
-    fbT = -1,
-    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
-    ),
-  "3" = list(
-    f_X1 = c(bquote(pmin(rlnorm(N_pop, 0, 0.5), 5))),
-    f_X2 = c(bquote(pmin(rlnorm(N_pop, 0, 0.5), 5))),
-    bT_X1 = 2,
-    bT2_X1 = 0,
-    bT_X2 = 2,
-    bT2_X2 = 0,
-    fbT = -1,
-    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
+    bY_A_X1_2 = 1,
+    fbT = -1
   ),
-  "4" = list(
-    f_X1 = c(bquote(pmin(rlnorm(N_pop, 0, 0.5), 5))),
-    f_X2 = c(bquote(pmin(rlnorm(N_pop, 0, 0.5), 5))),
-    bT_X1 = 2,
-    bT2_X1 = 0,
-    bT_X2 = 2,
-    bT2_X2 = 0,
-    fbT = 1,
-    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
+
+  # DGM-11 : outcome binaire - bon overlap
+  "11" = list(
+    f_X1 = c(bquote(rnorm(N_pop, 0, 1))),
+    f_X2 = c(bquote(rnorm(N_pop, 0, 1))),
+    outcome_distribution = "binomial",
+    fbT = 1
   ),
-  "5" = list(
-    f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
-    f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
-    bT_X1 = 1,
-    bT2_X1 = -1,
-    bT_X2 = 1,
-    bT2_X2 = -1,
-    fbT = 0.5,
-    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
-  ),
-  "6" = list(
-    f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
-    f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 1), rnorm(N_pop/2, 3, 1))))),
-    bT_X1 = 1,
-    bT2_X1 = -1,
-    bT_X2 = 1,
-    bT2_X2 = -1,
-    fbT = -0.5,
-    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
-  ),
-  "7" = list(
-    f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
-    f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
-    bT_X1 = 1,
-    bT2_X1 = -1,
-    bT_X2 = 1,
-    bT2_X2 = -1,
-    fbT = 0.5,
-    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
-  ),
-  "8" = list(
-    f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
-    f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
-    bT_X1 = 1,
-    bT2_X1 = -1,
-    bT_X2 = 1,
-    bT2_X2 = -1,
-    fbT = -0.5,
-    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
+
+  # DGM-12 : outcome binaire - mauvais overlap
+  "12" = list(
+    f_X1 = c(bquote(rnorm(N_pop, 0, 1))),
+    f_X2 = c(bquote(rnorm(N_pop, 0, 1))),
+    outcome_distribution = "binomial",
+    fbT = -1
   )
 )
 
@@ -121,7 +153,7 @@ list_parameters <- lapply(list_changing_parameters, \(x) {
 df_population_parameters <- list_parameters |> tibble::as_tibble() |> t()
 colnames(df_population_parameters) <- names(df_default_parameters)
 df_population_parameters <- data.table::as.data.table(df_population_parameters)
-df_population_parameters[, population_parameters_num := 1:.N]
+df_population_parameters[, population_parameters_num := as.integer(names(list_changing_parameters))]
 
 
 ##############################################
@@ -281,20 +313,20 @@ indirect_comparisons <- function(pop_init,
   ########## REGRESSION BASED OUTCOME MODEL (both treatment IPD)
   ##############################################################
 
-  struct_results$regression$anchored$glm <- run_regression_model(trial_AC,
-                                                                 trial_BC,
-                                                                 outcome_regression_model,
-                                                                 covariate_names,
-                                                                 full_ipd = TRUE,
-                                                                 anchored = TRUE,
-                                                                 outcome_family = glm_family)
-  struct_results$regression$unanchored$glm <-  run_regression_model(trial_AC,
-                                                                    trial_BC,
-                                                                    outcome_regression_model,
-                                                                    covariate_names,
-                                                                    full_ipd = TRUE,
-                                                                    anchored = FALSE,
-                                                                    outcome_family = glm_family)
+  # struct_results$regression$anchored$glm <- run_regression_model(trial_AC,
+  #                                                                trial_BC,
+  #                                                                outcome_regression_model,
+  #                                                                covariate_names,
+  #                                                                full_ipd = TRUE,
+  #                                                                anchored = TRUE,
+  #                                                                outcome_family = glm_family)
+  # struct_results$regression$unanchored$glm <-  run_regression_model(trial_AC,
+  #                                                                   trial_BC,
+  #                                                                   outcome_regression_model,
+  #                                                                   covariate_names,
+  #                                                                   full_ipd = TRUE,
+  #                                                                   anchored = FALSE,
+  #                                                                   outcome_family = glm_family)
 
   #################################################
   ########### PROPENSITY SCORE (both treatment IPD)
@@ -418,20 +450,20 @@ indirect_comparisons <- function(pop_init,
   ##########
   ###### STC
   ##########
-  struct_results$regression$anchored$stc <- run_regression_model(trial_AC,
-                                                                 trial_BC,
-                                                                 outcome_regression_model,
-                                                                 covariate_names,
-                                                                 full_ipd = FALSE,
-                                                                 anchored = TRUE,
-                                                                 outcome_family = glm_family)
-  struct_results$regression$unanchored$stc <- run_regression_model(trial_AC,
-                                                                   trial_BC,
-                                                                   outcome_regression_model,
-                                                                   covariate_names,
-                                                                   full_ipd = FALSE,
-                                                                   anchored = FALSE,
-                                                                   outcome_family = glm_family)
+  # struct_results$regression$anchored$stc <- run_regression_model(trial_AC,
+  #                                                                trial_BC,
+  #                                                                outcome_regression_model,
+  #                                                                covariate_names,
+  #                                                                full_ipd = FALSE,
+  #                                                                anchored = TRUE,
+  #                                                                outcome_family = glm_family)
+  # struct_results$regression$unanchored$stc <- run_regression_model(trial_AC,
+  #                                                                  trial_BC,
+  #                                                                  outcome_regression_model,
+  #                                                                  covariate_names,
+  #                                                                  full_ipd = FALSE,
+  #                                                                  anchored = FALSE,
+  #                                                                  outcome_family = glm_family)
 
 
   ##############################
@@ -459,10 +491,10 @@ struct_results <- list(
     anchored = list(agd = NULL),
     unanchored = list(agd = NULL)
   ),
-  regression = list(
-    anchored = list(glm = NULL, stc = NULL),
-    unanchored = list(glm = NULL, stc = NULL)
-  ),
+  # regression = list(
+  #   anchored = list(glm = NULL, stc = NULL),
+  #   unanchored = list(glm = NULL, stc = NULL)
+  # ),
   iptw = list(
     anchored = list(ml = NULL, maic_1 = NULL, maic_2 = NULL),
     unanchored = list(ml = NULL, maic_1 = NULL, maic_2 = NULL)

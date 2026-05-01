@@ -1,4 +1,4 @@
-options(mc.cores = 7)
+options(mc.cores = 8)
 
 source("estimators.R")
 source("data_generation.R")
@@ -7,8 +7,8 @@ source("data_generation.R")
 # Parameters
 ####################
 N_pop <- 2*10^6 # Size of the superpopulation, from which trials are drawn for each iteration
-N_BOOT_ITER <- 2000 # Number of bootstrap iterations for variance estimation
-n_iter <- 2000 # Number of Monte-Carlo iterations
+N_BOOT_ITER <- 200 # Number of bootstrap iterations for variance estimation
+n_iter <- 1000 # Number of Monte-Carlo iterations
 retrieve_ps_weights <- TRUE # Whether to save each trial data, in order to be able to plot propensity score for each weighting estimator
 
 
@@ -22,10 +22,11 @@ experiment_results_directory <- file.path("results_simulations", time_start_stri
 if (!dir.exists(experiment_results_directory)) dir.create(experiment_results_directory, recursive = TRUE)
 saveRDS(df_population_parameters, file.path(experiment_results_directory, "df_population_parameters.RDS"))
 saveRDS(df_estimators_parameters, file.path(experiment_results_directory, "df_estimators_parameters.RDS"))
+data.table::setDTthreads(1)  # disable data.table threading to avoid conflicts with mclapply forking
 for (row_population in 1:nrow(df_population_parameters)) {
-  dir_sub_experiment <- file.path(experiment_results_directory, row_population)
-  dir.create(dir_sub_experiment)
   list_simulation_parameters <- df_population_parameters[row_population, ] |> unlist()
+  dir_sub_experiment <- file.path(experiment_results_directory, list_simulation_parameters[["population_parameters_num"]])
+  dir.create(dir_sub_experiment)
 
   print("creating population")
   print(Sys.time())
@@ -80,7 +81,7 @@ source("processing_results.R")
 print("graph distribution covariates")
 source("graph_distribution_covariates.R")
 source("graphs_publication.R")
-source("graph_propensity_scores.R") # Requires retrieve_ps_weights = TRUE
+if (retrieve_ps_weights) source("graph_propensity_scores.R")
 source("zipping_results.R") # Useful if executed on a remote server, to pull results easily
 beepr::beep(3)
 Sys.sleep(4)

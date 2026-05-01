@@ -6,9 +6,12 @@ source("env_variables.R")
 
 dir_experience_results <- file.path("results_simulations", DATE_EXPERIMENT)
 
-list_files <- lapply(list.dirs(dir_experience_results, full.names = TRUE), \(x) {
-  list.files(x, full.names = TRUE, pattern = "^experiment_results.*\\.RDS")
-}) |> Filter(f = \(x) length(x) != 0)
+list_files <- {
+  dirs <- list.dirs(dir_experience_results, full.names = TRUE)
+  res <- lapply(dirs, \(x) list.files(x, full.names = TRUE, pattern = "^experiment_results.*\\.RDS"))
+  names(res) <- dirs
+  Filter(f = \(x) length(x) != 0, res)
+}
 
 nested_list_results_df <- rapply(list_files, classes = "character", how = "replace", \(x) {
   sapply(x, readRDS, simplify = FALSE)
@@ -19,6 +22,7 @@ long_df_results <- lapply(nested_list_results_df, \(l) {
   lapply(rbindlist, idcol = "estimator_num", use.names = TRUE) |>
   lapply(\(df) {suppressWarnings(df$error_estimate <- NULL); return(df)}) |> # removing the column problems, to use it separately
   rbindlist(idcol = "population_parameters_num", use.names = TRUE)
+long_df_results[, population_parameters_num := basename(population_parameters_num) |> as.integer()]
 long_df_results[, estimator_num := gsub(pattern = ".*(?<=experiment_results_)(\\d+)(?=\\.RDS).*",
                                         replacement = "\\1", x = estimator_num, perl = TRUE)]
 
@@ -29,7 +33,8 @@ long_df_problems <- lapply(nested_list_results_df, \(l) {
   lapply(\(df) {df$estimate <- NULL; df$variance <- NULL; return(df)}) |>
   rbindlist(idcol = "population_parameters_num", use.names = TRUE, fill = TRUE) |>
   dplyr::mutate(estimator_num = sub(estimator_num, pattern = ".*experiment_results_", replacement = "", perl = TRUE)) |>
-  dplyr::mutate(estimator_num = sub(estimator_num, pattern = "(?<=[0-9])\\.RDS", replacement = "", perl = TRUE) |> as.integer(),
+  dplyr::mutate(population_parameters_num = basename(population_parameters_num) |> as.integer(),
+                estimator_num = sub(estimator_num, pattern = "(?<=[0-9])\\.RDS", replacement = "", perl = TRUE) |> as.integer(),
                 adjustment = case_match(adjustment,
                                         "unadjusted" ~ "Unadjusted",
                                         "regression" ~ "Regression",

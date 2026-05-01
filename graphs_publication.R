@@ -25,7 +25,7 @@ df_stats <- df_stats |>
                    by = c("Population_parameters_num", "Estimator_num", "Adjustment", "Model", "Anchored", "Data"))
 
 
-list_population_parameters <- as.character(1:8)
+list_population_parameters <- as.character(sort(unique(df_stats$Population_parameters_num)))
 
 for (population_parameters_num in list_population_parameters) {
 
@@ -71,13 +71,14 @@ for (population_parameters_num in list_population_parameters) {
          plot = plot_results_DGM)
 }
 
-# Graph with pair of treatments
-pair_list_population_parameters <- list(
-  "1" = c("1", "2"),
-  "2" = c("3", "4"),
-  "3" = c("5", "6"),
-  "4" = c("7", "8")
-)
+# Graph with pair of treatments — built automatically from the scenarios that were run.
+# Scenarios are paired consecutively; if the count is odd the first scenario is unpaired
+# (it still appears in the individual per-scenario plots above).
+pair_list_population_parameters <- {
+  scen <- list_population_parameters
+  if (length(scen) %% 2 == 1) scen <- scen[-1]
+  lapply(seq(1, length(scen), by = 2), \(i) scen[c(i, i + 1)])
+}
 for (pair_population_parameters_num in pair_list_population_parameters) {
 
   df_plot <- df_stats |>
@@ -226,21 +227,22 @@ for (population_parameters_num in list_population_parameters) {
   if (any(!is.na(df_plot$missing_count))) warning(paste0("Missing values for population_parameters_num: ", population_parameters_num))
 }
 
-plot_bias_confounding <- list_plots[["1"]] +
-  list_plots[["2"]] +
-  list_plots[["3"]] +
-  list_plots[["4"]] +
-  list_plots[["5"]] +
-  list_plots[["6"]] +
-  list_plots[["7"]] +
-  list_plots[["8"]] +
-  plot_layout(ncol = 2,
-              guides = "collect") &
+n_panels <- length(list_population_parameters)
+n_rows   <- ceiling(n_panels / 2)
+plot_height <- n_rows * 4
+
+expression_plots <- paste(
+  lapply(list_population_parameters, \(num_population) {
+    paste0("list_plots[[", num_population, "]]")
+  }), collapse = " + "
+)
+plot_bias_confounding <- eval(expr = parse(text = expression_plots)) +
+  plot_layout(ncol = 2, guides = "collect") &
   theme(plot.title = element_text(size = 20),
         legend.position = "bottom",
         legend.box = "vertical")
-ggsave(filename = file.path(dir_results, "plots_publication", paste0("bias_confounding.pdf")),
-       width = 15, height = 16,
+ggsave(filename = file.path(dir_results, "plots_publication", "bias_confounding.pdf"),
+       width = 15, height = plot_height,
        plot = plot_bias_confounding)
 
 

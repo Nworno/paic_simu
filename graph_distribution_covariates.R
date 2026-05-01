@@ -22,7 +22,7 @@ df_population_parameters <- readRDS(file.path(path_experiment, "df_population_pa
 # Drawing covariates distributions, one scenario after the other
 ###############################################################
 
-scenario_of_interest <- as.character(1:8)
+scenario_of_interest <- as.character(sort(unique(df_population_parameters$population_parameters_num)))
 plots_distribution_covariates <- list()
 for (num_population in scenario_of_interest) {
   print(num_population)
@@ -121,18 +121,13 @@ for (num_population in scenario_of_interest) {
   print(path_results_experiments)
 }
 
-g <- plots_distribution_covariates[[1]] +
-  plots_distribution_covariates[[2]] +
-  plots_distribution_covariates[[3]] +
-  plots_distribution_covariates[[4]] +
-  plots_distribution_covariates[[5]] +
-  plots_distribution_covariates[[6]] +
-  plots_distribution_covariates[[7]] +
-  plots_distribution_covariates[[8]] +
+n_panels    <- length(plots_distribution_covariates)
+plot_height <- ceiling(n_panels / 2) * 4
+g <- patchwork::wrap_plots(plots_distribution_covariates[scenario_of_interest]) +
   plot_layout(guides = "collect", ncol = 2) &
   theme(legend.position = "bottom") &
-  patchwork::plot_annotation(title  = "Covariates (X1 and X2) distributions in a and b trials")
+  patchwork::plot_annotation(title = "Covariates (X1 and X2) distributions in a and b trials")
 ggplot2::ggsave(plot = g,
                 filename = file.path(path_experiment, "plots_publication", "all_covariates_distribution.pdf"),
-       width = 10, height = 15)
+                width = 10, height = plot_height)
 

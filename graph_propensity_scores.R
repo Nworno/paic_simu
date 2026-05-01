@@ -8,7 +8,8 @@ print(DATE_EXPERIMENT)
 if (!dir.exists(file.path(dir_results, "plots_publication"))) dir.create(file.path(dir_results, "plots_publication"))
 
 
-list_population_parameters <- as.character(1:8)
+df_pop_params <- readRDS(file.path(dir_results, "df_population_parameters.RDS"))
+list_population_parameters <- as.character(sort(unique(df_pop_params$population_parameters_num)))
 # Plot propensity distribution --------
 list_plots <- list()
 for (config in 1:2) {
@@ -80,21 +81,16 @@ for (config in 1:2) {
       (if (length(var) > 1) labs(X = "X value") else labs(X = var))
   }
 
-  plot_propensity_distributions <- list_plots[["1"]] +
-    list_plots[["2"]] +
-    list_plots[["3"]] +
-    list_plots[["4"]] +
-    list_plots[["5"]] +
-    list_plots[["6"]] +
-    list_plots[["7"]] +
-    list_plots[["8"]] +
+  n_panels    <- length(list_population_parameters)
+  plot_height <- ceiling(n_panels / 2) * 5
+  plot_propensity_distributions <- patchwork::wrap_plots(list_plots[list_population_parameters]) +
     plot_layout(ncol = 2, guides = "collect") &
     theme(plot.title = element_text(size = 20),
           legend.position = "bottom",
           legend.box = "vertical",
           legend.text = element_text(size = 16))
-  ggsave(filename = file.path(dir_results, "plots_publication", paste0("PS_distributions_all_", var_col, "_", anchored, ".jpeg")), # for some reasons, pdf is much larger for that one
-         width = 15, height = 20,
+  ggsave(filename = file.path(dir_results, "plots_publication", paste0("PS_distributions_all_", var_col, "_", anchored, ".jpeg")),
+         width = 15, height = plot_height,
          plot = plot_propensity_distributions)
 
 }
