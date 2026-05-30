@@ -259,7 +259,12 @@ run_propensity_score <- function(trial_AC, trial_BC, covariate_names, assignment
 
 
   variance_AB <- variance_BC + variance_AC # works only on a linear scale, so estimate output has to remain linear
-  list_ps_results <- list("estimate" = estimate_AB$value, "variance" = variance_AB, "error_estimate" = error_estimate)
+
+  # Kish effective sample size on the reweighted arm (AC trial for anchored, A arm only for unanchored)
+  w_ess <- if (anchored) results$df[trial == "AC", trial_weights] else results$df[ttt == "A", trial_weights]
+  ess <- sum(w_ess)^2 / sum(w_ess^2)
+
+  list_ps_results <- list("estimate" = estimate_AB$value, "variance" = variance_AB, "error_estimate" = error_estimate, "ess" = ess)
   if (retrieve_ps_weights) list_ps_results$df <- results$df
   return(list_ps_results)
 }

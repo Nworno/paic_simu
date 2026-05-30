@@ -6,9 +6,9 @@ source("data_generation.R")
 ####################
 # Parameters
 ####################
-N_pop <- 2*10^6 # Size of the superpopulation, from which trials are drawn for each iteration
-N_BOOT_ITER <- 200 # Number of bootstrap iterations for variance estimation
-n_iter <- 1000 # Number of Monte-Carlo iterations
+N_pop <- 2*10^5 # Size of the superpopulation, from which trials are drawn for each iteration
+N_BOOT_ITER <- 20 # Number of bootstrap iterations for variance estimation
+n_iter <- 10 # Number of Monte-Carlo iterations
 retrieve_ps_weights <- TRUE # Whether to save each trial data, in order to be able to plot propensity score for each weighting estimator
 
 
@@ -75,13 +75,14 @@ for (row_population in 1:nrow(df_population_parameters)) {
 cat("Simulation length: ")
 print(Sys.time() - time_start)
 print(time_start_string)
-write(paste0("DATE_EXPERIMENT <- '", time_start_string, "'"), file = "env_variables.R", append = FALSE)
+write(paste0("DATE_EXPERIMENT <- '", time_start_string, "'\nN_pop <- ", N_pop), file = "env_variables.R", append = FALSE)
 print("processing results")
 source("processing_results.R")
-print("graph distribution covariates")
-source("graph_distribution_covariates.R")
-source("graphs_publication.R")
+#print("graph distribution covariates")
+#source("graph_distribution_covariates.R")
+#source("graphs_publication.R")
 if (retrieve_ps_weights) source("graph_propensity_scores.R")
 source("zipping_results.R") # Useful if executed on a remote server, to pull results easily
-beepr::beep(3)
-Sys.sleep(4)
+system('curl -X POST https://ntfy.sh/paic_simu -d "results.zip ready"')
+#beepr::beep(3)
+#Sys.sleep(4)

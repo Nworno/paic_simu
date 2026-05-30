@@ -110,6 +110,36 @@ get_cov_95 <- function(coef, se, theo) {
 
 get_number_na_estimate <- function(Estimate) sum(is.na(Estimate))
 
+get_se_bias <- function(obs, theo) {
+  n <- sum(!is.na(obs - theo))
+  sd(obs - theo, na.rm = TRUE) / sqrt(n)
+}
+
+get_se_RMSE <- function(obs, theo) {
+  sq_err <- (obs - theo)^2
+  rmse_val <- sqrt(mean(sq_err, na.rm = TRUE))
+  n <- sum(!is.na(sq_err))
+  sqrt(var(sq_err, na.rm = TRUE) / n) / (2 * rmse_val)
+}
+
+get_se_VR <- function(obs, se_obs) {
+  n <- sum(!is.na(obs) & !is.na(se_obs))
+  mean_se <- mean(se_obs, na.rm = TRUE)
+  sd_est  <- sd(obs, na.rm = TRUE)
+  vr <- mean_se / sd_est
+  # Delta method: Var(VR) ≈ VR² * (Var(se)/n/mean_se² + 1/(2*(n-1)))
+  vr * sqrt(var(se_obs, na.rm = TRUE) / (n * mean_se^2) + 1 / (2 * (n - 1)))
+}
+
+get_se_cov_95 <- function(coef, se, theo) {
+  ub <- coef + qnorm(0.975) * se
+  lb <- coef - qnorm(0.975) * se
+  covered <- (theo < ub & theo > lb)
+  p <- mean(covered, na.rm = TRUE)
+  n <- sum(!is.na(covered))
+  sqrt(p * (1 - p) / n)
+}
+
 correct_decision <- function(coef, se, theo) {
   ub <- coef + qnorm(0.975)*se
   lb <- coef - qnorm(0.975)*se
@@ -120,20 +150,35 @@ correct_decision <- function(coef, se, theo) {
   mean(correct_decision, na.rm = TRUE)
 }
 
-df_stats <- joined_results |>
+df_stats_wide <- joined_results |>
   group_by(Population_parameters_num, Estimator_num, Adjustment, Model, Anchored, Data) |>
   # Replacing NAs with warnings
   mutate(Estimate = ifelse(!is.na(Error_estimate), NA, Estimate),
-          Variance = ifelse(!is.na(Error_estimate), NA, Variance)) |>
-  summarize(bias = get_bias(Estimate, True_effect ),
-            rmse = get_RMSE(Estimate, True_effect ),
+         Variance = ifelse(!is.na(Error_estimate), NA, Variance)) |>
+  summarize(bias = get_bias(Estimate, True_effect),
+            se_bias = get_se_bias(Estimate, True_effect),
+            rmse = get_RMSE(Estimate, True_effect),
+            se_rmse = get_se_RMSE(Estimate, True_effect),
             vr = get_VR(Estimate, sqrt(Variance)),
-            cov_95 = get_cov_95(Estimate, sqrt(Variance), True_effect ),
+            se_vr = get_se_VR(Estimate, sqrt(Variance)),
+            cov_95 = get_cov_95(Estimate, sqrt(Variance), True_effect),
+            se_cov_95 = get_se_cov_95(Estimate, sqrt(Variance), True_effect),
             number_na_estimate = get_number_na_estimate(Estimate),
             correct_decision = correct_decision(Estimate, Variance, True_effect),
-            .groups = "drop") |>
+            .groups = "drop")
+
+group_cols <- c("Population_parameters_num", "Estimator_num", "Adjustment", "Model", "Anchored", "Data")
+
+df_stats <- df_stats_wide |>
   pivot_longer(cols = c("bias", "rmse", "vr", "cov_95", "correct_decision", "number_na_estimate"),
-               names_to = "indicator", values_to = "values")
+               names_to = "indicator", values_to = "values") |>
+  dplyr::left_join(
+    df_stats_wide |>
+      pivot_longer(cols = c("se_bias", "se_rmse", "se_vr", "se_cov_95"),
+                   names_to = "indicator", names_prefix = "se_", values_to = "se_mc") |>
+      dplyr::select(all_of(c(group_cols, "indicator", "se_mc"))),
+    by = c(group_cols, "indicator")
+  )
 
 dir.create(file.path(dir_experience_results, "processed_results"))
 saveRDS(df_stats, file.path(dir_experience_results, "processed_results", "df_stats.rds"))

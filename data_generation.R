@@ -476,7 +476,7 @@ indirect_comparisons <- function(pop_init,
     tidyr::unnest_longer(value, indices_to = "indicator") |>
     dplyr::rename(adjustment = name) |>
     tidyr::pivot_wider(names_from = indicator, values_from = value) |>
-    dplyr::mutate(across(c(estimate, variance), as.numeric))
+    dplyr::mutate(across(c(estimate, variance, ess), as.numeric))
 
   list_results <- list(rectangle_results = rectangle_results)
   if (retrieve_ps_weights) list_results$struct_ps_df <- struct_ps_df

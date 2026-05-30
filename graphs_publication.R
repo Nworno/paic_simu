@@ -22,7 +22,12 @@ na_counts <- df_stats |>
 
 df_stats <- df_stats |>
   dplyr::left_join(na_counts,
-                   by = c("Population_parameters_num", "Estimator_num", "Adjustment", "Model", "Anchored", "Data"))
+                   by = c("Population_parameters_num", "Estimator_num", "Adjustment", "Model", "Anchored", "Data")) |>
+  dplyr::left_join(
+    df_population_parameters |>
+      dplyr::distinct(Population_parameters_num = population_parameters_num, outcome_distribution),
+    by = "Population_parameters_num"
+  )
 
 
 list_population_parameters <- as.character(sort(unique(df_stats$Population_parameters_num)))
@@ -31,7 +36,8 @@ for (population_parameters_num in list_population_parameters) {
 
   df_plot <- df_stats |>
     dplyr::filter(Population_parameters_num == population_parameters_num,
-                  ((Estimator_num == 3 & Anchored == "Unanchored") | (Estimator_num == 1 & Anchored == "Anchored")), # plotting complete models only here
+                  ((Estimator_num == 3 & Anchored == "Unanchored") |
+                   (Anchored == "Anchored" & ifelse(outcome_distribution == "binomial", Estimator_num == 3, Estimator_num == 1))), # plotting complete models only here
     ) |>
     dplyr::filter(!indicator %in% c("correct_decision", "number_na_estimate") &
                     `Adjustment` %in% c("Unadjusted", "IPTW")) |>
@@ -52,6 +58,8 @@ for (population_parameters_num in list_population_parameters) {
     )
   plot_results_DGM <- ggplot(df_plot) +
     facet_wrap(~indicator, scales = "free_x") +
+    geom_errorbarh(aes(y = Model, xmin = values - 1.96 * se_mc, xmax = values + 1.96 * se_mc, color = Anchored),
+                   height = 0.2, alpha = 0.5) +
     geom_point(aes(y = Model, x = values, color = Anchored, shape = Anchored), size = 7, alpha = 0.7) +
     geom_text(data = dplyr::filter(df_plot, !is.na(missing_count)),
               aes(x = values, y = Model, label = paste0("*")),
@@ -71,19 +79,20 @@ for (population_parameters_num in list_population_parameters) {
          plot = plot_results_DGM)
 }
 
-# Graph with pair of treatments — built automatically from the scenarios that were run.
-# Scenarios are paired consecutively; if the count is odd the first scenario is unpaired
-# (it still appears in the individual per-scenario plots above).
-pair_list_population_parameters <- {
-  scen <- list_population_parameters
-  if (length(scen) %% 2 == 1) scen <- scen[-1]
-  lapply(seq(1, length(scen), by = 2), \(i) scen[c(i, i + 1)])
-}
+pair_list_population_parameters <- list(
+  c("1",  "2"),
+  c("3",  "4"),
+  c("5",  "6"),
+  c("7",  "8"),
+  c("9",  "10"),
+  c("11", "12")
+)
 for (pair_population_parameters_num in pair_list_population_parameters) {
 
   df_plot <- df_stats |>
     dplyr::filter(Population_parameters_num %in% pair_population_parameters_num,
-                  ((Estimator_num == 3 & Anchored == "Unanchored") | (Estimator_num == 1 & Anchored == "Anchored")), # plotting complete models only here
+                  ((Estimator_num == 3 & Anchored == "Unanchored") |
+                   (Anchored == "Anchored" & ifelse(outcome_distribution == "binomial", Estimator_num == 3, Estimator_num == 1))), # plotting complete models only here
     ) |>
     dplyr::filter(!indicator %in% c("correct_decision", "number_na_estimate") &
                     `Adjustment` %in% c("Unadjusted", "IPTW")) |>
@@ -102,11 +111,14 @@ for (pair_population_parameters_num in pair_list_population_parameters) {
                                     "vr" ~ "VR",
                                     "cov_95" ~ "95% coverage") |> factor(levels = c("Bias", "RMSE", "VR", "95% coverage"))
     )
+  if (nrow(df_plot) == 0) next
   if (any(!is.na(df_plot$missing_count))) warning(paste0("Missing values for population_parameters_num: ", pair_population_parameters_num))
   list_plots <- lapply(pair_population_parameters_num, function(elem) {
      sub_df_plot <- df_plot |> dplyr::filter(Population_parameters_num == elem)
       ggplot(sub_df_plot) +
       facet_wrap(~indicator, scales = "free_x") +
+      geom_errorbarh(aes(y = Model, xmin = values - 1.96 * se_mc, xmax = values + 1.96 * se_mc, color = Anchored),
+                     height = 0.2, alpha = 0.5) +
       geom_point(aes(y = Model, x = values, color = Anchored, shape = Anchored), size = 7, alpha = 0.7) +
       geom_text(data = dplyr::filter(sub_df_plot, !is.na(missing_count)),
                 aes(x = values, y = Model, label = paste0("*")),
@@ -233,7 +245,7 @@ plot_height <- n_rows * 4
 
 expression_plots <- paste(
   lapply(list_population_parameters, \(num_population) {
-    paste0("list_plots[[", num_population, "]]")
+    paste0('list_plots[["', num_population, '"]]')
   }), collapse = " + "
 )
 plot_bias_confounding <- eval(expr = parse(text = expression_plots)) +
