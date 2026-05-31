@@ -152,7 +152,6 @@ correct_decision <- function(coef, se, theo) {
 
 df_stats_wide <- joined_results |>
   group_by(Population_parameters_num, Estimator_num, Adjustment, Model, Anchored, Data) |>
-  # Replacing NAs with warnings
   mutate(Estimate = ifelse(!is.na(Error_estimate), NA, Estimate),
          Variance = ifelse(!is.na(Error_estimate), NA, Variance)) |>
   summarize(bias = get_bias(Estimate, True_effect),
@@ -170,6 +169,7 @@ df_stats_wide <- joined_results |>
 group_cols <- c("Population_parameters_num", "Estimator_num", "Adjustment", "Model", "Anchored", "Data")
 
 df_stats <- df_stats_wide |>
+  select(-starts_with("se_")) |>
   pivot_longer(cols = c("bias", "rmse", "vr", "cov_95", "correct_decision", "number_na_estimate"),
                names_to = "indicator", values_to = "values") |>
   dplyr::left_join(
