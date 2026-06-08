@@ -1,14 +1,12 @@
-options(mc.cores = 1)
-
 source("estimators.R")
 source("data_generation.R")
 
 ####################
 # Parameters
 ####################
-N_pop <- 2*10^5 # Size of the superpopulation, from which trials are drawn for each iteration
+N_pop <- 2*10^6 # Size of the superpopulation, from which trials are drawn for each iteration
 N_BOOT_ITER <- 2 # Number of bootstrap iterations for variance estimation
-n_iter <- 2 # Number of Monte-Carlo iterations
+n_iter <- 10 # Number of Monte-Carlo iterations
 retrieve_ps_weights <- TRUE # Whether to save each trial data, in order to be able to plot propensity score for each weighting estimator
 
 
@@ -22,7 +20,6 @@ experiment_results_directory <- file.path("results_simulations", time_start_stri
 if (!dir.exists(experiment_results_directory)) dir.create(experiment_results_directory, recursive = TRUE)
 saveRDS(df_population_parameters, file.path(experiment_results_directory, "df_population_parameters.RDS"))
 saveRDS(df_estimators_parameters, file.path(experiment_results_directory, "df_estimators_parameters.RDS"))
-data.table::setDTthreads(1)  # disable data.table threading to avoid conflicts with mclapply forking
 for (row_population in 1:nrow(df_population_parameters)) {
   list_simulation_parameters <- df_population_parameters[row_population, ] |> unlist()
   dir_sub_experiment <- file.path(experiment_results_directory, list_simulation_parameters[["population_parameters_num"]])
@@ -39,7 +36,7 @@ for (row_population in 1:nrow(df_population_parameters)) {
 
   for (row_estimators in 1:nrow(df_estimators_parameters)) {
     list_estimators_parameters <- df_estimators_parameters[row_estimators, ] |> unlist(recursive = FALSE)
-    results_simulations <- parallel::mclapply(1:n_iter, \(i) {
+    results_simulations <- lapply(1:n_iter, \(i) {
       time_start_iteration <- Sys.time()
       result_indirect_comparison <- indirect_comparisons(pop_init,
                                                          struct_results,

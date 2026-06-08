@@ -23,8 +23,23 @@ df_population_parameters <- readRDS(file.path(path_experiment, "df_population_pa
 ###############################################################
 
 scenario_of_interest <- as.character(sort(unique(df_population_parameters$population_parameters_num)))
+
+# Scenarios sharing identical covariate distributions (same f_X1/X2 and trial assignment)
+covariate_groups <- list(c("1", "7", "9"), c("2", "8", "10"))
+scenario_group_label    <- setNames(paste0("DGM-", scenario_of_interest), scenario_of_interest)
+scenario_representative <- setNames(scenario_of_interest, scenario_of_interest)
+for (grp in covariate_groups) {
+  label <- paste0("DGM-", paste(grp, collapse = ", "))
+  for (s in grp) {
+    scenario_group_label[s]    <- label
+    scenario_representative[s] <- grp[1]
+  }
+}
+unique_scenarios <- scenario_of_interest[sapply(scenario_of_interest, \(s) scenario_representative[s] == s)]
+
 plots_distribution_covariates <- list()
 for (num_population in scenario_of_interest) {
+  if (scenario_representative[num_population] != num_population) next
   print(num_population)
   path_results_experiments <- file.path(path_experiment, num_population)
   if (!dir.exists(path_results_experiments)) dir.create(path_results_experiments)
@@ -56,7 +71,7 @@ for (num_population in scenario_of_interest) {
   plots_distribution_covariates[[num_population]] <- all_individuals[variable == "X1", ] |>
     ggplot() +
     geom_density(aes(variable_value, fill = trial, color = trial), alpha = 0.7) +
-    labs(x = NULL, y = NULL, fill = "Trial", color = "Trial", title = paste0("DGM-", num_population)) +
+    labs(x = NULL, y = NULL, fill = "Trial", color = "Trial", title = scenario_group_label[num_population]) +
     scale_fill_manual(values = c("AC (IPD)" = "#2ecc71", "BC (AgD)" = "#f1c40f"),
                       labels = c("AC (IPD)" = expression(italic(a) *  "(IPD)"),
                                  "BC (AgD)" = expression(italic(b) * "(AgD)"))
@@ -98,9 +113,9 @@ for (num_population in scenario_of_interest) {
 
     conditional_outcome_distribution <- average_outcome_df[outcome_type == "conditional", ] |>
       melt(measure.vars = c("A", "B", "C"), id.vars = c("trial"), variable.name = "ttt") |>
-      data.table:::DT(, .(value_0 = 1 - value, trial, ttt, value)) |>
+      (\(dt) dt[, .(value_0 = 1 - value, trial, ttt, value)])() |>
       melt(measure.vars = c("value", "value_0"), variable.name = "prop_Y_obs") |>
-      data.table:::DT(, .(prop_Y_obs = factor(prop_Y_obs, levels = c("value_0", "value"), labels = c("0", "1")), trial, ttt, value))
+      (\(dt) dt[, .(prop_Y_obs = factor(prop_Y_obs, levels = c("value_0", "value"), labels = c("0", "1")), trial, ttt, value)])()
 
     plot_outcome_distribution <- rbindlist(list("marginal" = marginal_outcome_distribution,
                                                 "conditional" = conditional_outcome_distribution),
@@ -123,11 +138,10 @@ for (num_population in scenario_of_interest) {
 
 n_panels    <- length(plots_distribution_covariates)
 plot_height <- ceiling(n_panels / 2) * 4
-g <- patchwork::wrap_plots(plots_distribution_covariates[scenario_of_interest]) +
+g <- patchwork::wrap_plots(plots_distribution_covariates[unique_scenarios]) +
   plot_layout(guides = "collect", ncol = 2) &
   theme(legend.position = "bottom") &
   patchwork::plot_annotation(title = "Covariates (X1 and X2) distributions in a and b trials")
 ggplot2::ggsave(plot = g,
                 filename = file.path(path_experiment, "plots_publication", "all_covariates_distribution.pdf"),
                 width = 10, height = plot_height)
-

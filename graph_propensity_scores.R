@@ -10,6 +10,20 @@ if (!dir.exists(file.path(dir_results, "plots_publication"))) dir.create(file.pa
 
 df_pop_params <- readRDS(file.path(dir_results, "df_population_parameters.RDS"))
 list_population_parameters <- as.character(sort(unique(df_pop_params$population_parameters_num)))
+
+# Scenarios sharing identical PS distributions (same covariate distribution and trial assignment)
+covariate_groups <- list(c("1", "7", "9"), c("2", "8", "10"))
+scenario_group_label    <- setNames(paste0("DGM-", list_population_parameters), list_population_parameters)
+scenario_representative <- setNames(list_population_parameters, list_population_parameters)
+for (grp in covariate_groups) {
+  label <- paste0("DGM-", paste(grp, collapse = ", "))
+  for (s in grp) {
+    scenario_group_label[s]    <- label
+    scenario_representative[s] <- grp[1]
+  }
+}
+unique_scenarios <- list_population_parameters[sapply(list_population_parameters, \(s) scenario_representative[s] == s)]
+
 # Plot propensity distribution --------
 list_plots <- list()
 for (config in 1:2) {
@@ -21,14 +35,20 @@ for (config in 1:2) {
     anchored <- "anchored"
   }
   for (population_parameters_num in list_population_parameters) {
+    if (scenario_representative[population_parameters_num] != population_parameters_num) next
     experiment_dfs <- readRDS(file.path(dir_results,
                                         population_parameters_num,
                                         switch(anchored,
                                                anchored = "experiment_dfs_1.RDS",
                                                unanchored = "experiment_dfs_3.RDS")))
 
-    base_plot <- lapply(experiment_dfs, \(x) x[[switch(anchored, unanchored = 1, anchored = 2)]]) |> # 1 is unanchored, 2 is anchored
-      data.table::rbindlist() |>
+    combined_data <- lapply(experiment_dfs, \(x) x[[switch(anchored, unanchored = 1, anchored = 2)]]) |> # 1 is unanchored, 2 is anchored
+      data.table::rbindlist()
+    if (nrow(combined_data) == 0 || !all(c(var, "prob_BC", "trial", "ttt", "ml", "maic_1", "maic_2") %in% names(combined_data))) {
+      message("Skipping DGM ", population_parameters_num, " (", anchored, "): missing data or columns")
+      next
+    }
+    base_plot <- combined_data |>
       dplyr::select(all_of(var), true_PS = prob_BC, trial, ttt, ml, maic_1, maic_2) |>
       dplyr::mutate(unweighted = 1,
                     true_logit_ps = log(true_PS / (1 - true_PS))) |>
@@ -63,14 +83,14 @@ for (config in 1:2) {
       (if (length(var) > 1) facet_grid(X_name ~ weight_type) else facet_wrap(~weight_type)) +
       labs(x = var,
            y = "Propensity Score",
-           title = paste0("DGM-", population_parameters_num),
+           title = scenario_group_label[population_parameters_num],
            fill = "Trial",
            color = NULL) +
       scale_y_continuous(name = "Propensity score", breaks = c(0, 1)) +
       scale_color_manual(values = c("PS" = "black"), labels = c("PS" = expression("PS in " * italic(a) * " (IPD) trial"))) +
       scale_fill_manual(values = c("a" = "#2ecc71", "b" = "#f1c40f"),
                         labels = c("a" = expression(italic(a) *" (IPD)"),
-                                   "b" = expression(italic(b * "(AgD)")))
+                                   "b" = expression(italic(b) * " (AgD)"))
       ) +
       guides(color = guide_legend(override.aes = list(alpha = 1, color = 'black'))) +
       theme(text = element_text(size = 16),
@@ -78,12 +98,14 @@ for (config in 1:2) {
       expand_limits(y = c(0, 1)) +
       theme(legend.position = "bottom",
             legend.box = "vertical") +
-      (if (length(var) > 1) labs(X = "X value") else labs(X = var))
+      (if (length(var) > 1) labs(x = "X value") else labs(x = var))
   }
 
-  n_panels    <- length(list_population_parameters)
+  valid_plots <- Filter(Negate(is.null), list_plots[unique_scenarios])
+  if (length(valid_plots) == 0) next
+  n_panels    <- length(valid_plots)
   plot_height <- ceiling(n_panels / 2) * 5
-  plot_propensity_distributions <- patchwork::wrap_plots(list_plots[list_population_parameters]) +
+  plot_propensity_distributions <- patchwork::wrap_plots(valid_plots) +
     plot_layout(ncol = 2, guides = "collect") &
     theme(plot.title = element_text(size = 20),
           legend.position = "bottom",

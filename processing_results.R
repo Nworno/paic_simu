@@ -51,8 +51,6 @@ long_df_problems <- lapply(nested_list_results_df, \(l) {
                                       "anchored" ~ "Anchored",
                                       "unanchored" ~ "Unanchored",
                                       .default = anchored)) |>
-  dplyr::rowwise() |>
-  dplyr::mutate(error_estimate = purrr::pluck(error_estimate, "message", .default = NA)) |>
   dplyr::ungroup() |>
   dplyr::rename_with(.fn = stringr::str_to_title)
 

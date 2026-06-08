@@ -80,12 +80,11 @@ for (population_parameters_num in list_population_parameters) {
 }
 
 pair_list_population_parameters <- list(
-  c("1",  "2"),
-  c("3",  "4"),
-  c("5",  "6"),
-  c("7",  "8"),
-  c("9",  "10"),
-  c("11", "12")
+  c("1", "2"),
+  c("3", "4"),
+  c("5", "6"),
+  c("7", "8"),
+  c("9", "10")
 )
 for (pair_population_parameters_num in pair_list_population_parameters) {
 
