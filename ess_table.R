@@ -6,7 +6,7 @@ library(kableExtra)
 source("env_variables.R")
 
 dir_results  <- file.path("results_simulations", DATE_EXPERIMENT)
-dir_proc_ess <- file.path(dir_results, "processed_results")
+dir_proc_ess <- file.path(dir_results, "processed_results_with_ess")
 
 joined_results <- readRDS(file.path(dir_proc_ess, "joined_results.rds"))
 
@@ -18,13 +18,13 @@ model_levels    <- c("PSW", "MAIC-1", "MAIC-2")
 anchored_levels <- c("Anchored", "Unanchored")
 
 ess_summary <- joined_results |>
-  dplyr::filter(!is.na(Ess.x)) |>
+  dplyr::filter(!is.na(Ess)) |>
   dplyr::mutate(Model = dplyr::recode(Model, !!!model_display)) |>
   dplyr::group_by(Population_parameters_num, Estimator_num, Model, Anchored) |>
   dplyr::summarize(
-    mean_ess = mean(Ess.x, na.rm = TRUE),
-    sd_ess   = sd(Ess.x,   na.rm = TRUE),
-    n_iter   = sum(!is.na(Ess.x)),
+    mean_ess = mean(Ess, na.rm = TRUE),
+    sd_ess   = sd(Ess,   na.rm = TRUE),
+    n_iter   = sum(!is.na(Ess)),
     .groups  = "drop"
   ) |>
   dplyr::mutate(
@@ -53,6 +53,7 @@ header_top <- c(" " = 2, setNames(rep(2L, length(model_levels)), model_levels))
 
 latex_table <- ess_wide |>
   dplyr::select(DGM, Estimator, all_of(data_cols)) |>
+  dplyr::rename_with(.fn = \(x) sub(".*___", "", x), .cols = all_of(data_cols)) |>
   knitr::kable(
     format    = "latex",
     booktabs  = TRUE,

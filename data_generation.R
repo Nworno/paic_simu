@@ -92,31 +92,52 @@ list_changing_parameters <- list(
     fbT = -0.5,
     BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
   ),
-  # DGM-7 : interaction quadratique dans l'essai AC - bon overlap
   "7" = list(
+    f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
+    f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
+    bT_X1 = 1,
+    bT2_X1 = -1,
+    bT_X2 = 1,
+    bT2_X2 = -1,
+    fbT = 0.5,
+    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
+  ),
+  "8" = list(
+    f_X1 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
+    f_X2 = c(bquote(sample(c(rnorm(N_pop/2, 0, 0.5), rnorm(N_pop/2, 3, 0.5))))),
+    bT_X1 = 1,
+    bT2_X1 = -1,
+    bT_X2 = 1,
+    bT2_X2 = -1,
+    fbT = -0.5,
+    BC_trial_model = c(bquote(bT + bT_X1 * X1 + bT2_X1 * X1^2 + bT_X2 * X2 + bT2_X2 * X2^2))
+  ),
+
+  # DGM-9 : interaction quadratique dans l'essai AC - bon overlap
+  "9" = list(
     f_X1 = c(bquote(rnorm(N_pop, 0, 1))),
     f_X2 = c(bquote(rnorm(N_pop, 0, 1))),
     bY_A_X1_2 = 1
   ),
 
-  # DGM-8 : interaction quadratique dans l'essai AC - mauvais overlap
-  "8" = list(
+  # DGM-10 : interaction quadratique dans l'essai AC - mauvais overlap
+  "10" = list(
     f_X1 = c(bquote(rnorm(N_pop, 0, 1))),
     f_X2 = c(bquote(rnorm(N_pop, 0, 1))),
     bY_A_X1_2 = 1,
     fbT = -1
   ),
 
-  # DGM-9 : outcome binaire - bon overlap
-  "9" = list(
+  # DGM-11 : outcome binaire - bon overlap
+  "11" = list(
     f_X1 = c(bquote(rnorm(N_pop, 0, 1))),
     f_X2 = c(bquote(rnorm(N_pop, 0, 1))),
     outcome_distribution = "binomial",
     fbT = 1
   ),
 
-  # DGM-10 : outcome binaire - mauvais overlap
-  "10" = list(
+  # DGM-12 : outcome binaire - mauvais overlap
+  "12" = list(
     f_X1 = c(bquote(rnorm(N_pop, 0, 1))),
     f_X2 = c(bquote(rnorm(N_pop, 0, 1))),
     outcome_distribution = "binomial",
@@ -420,10 +441,6 @@ indirect_comparisons <- function(pop_init,
                                                          subsublist[["variance"]] <- ifelse(is.numeric(subsublist[["variance"]]),
                                                                                             subsublist[["variance"]],
                                                                                             NA)
-                                                         # Convert condition objects to their message string so that pivot_wider
-                                                         # does not create list-columns (which would break as.numeric on ess/estimate/variance)
-                                                         err <- subsublist[["error_estimate"]]
-                                                         subsublist[["error_estimate"]] <- if (inherits(err, "condition")) conditionMessage(err) else NA_character_
                                                          return(subsublist)
                                                        }, simplify = FALSE, USE.NAMES = TRUE),
                                      simplify = FALSE,
@@ -456,14 +473,10 @@ indirect_comparisons <- function(pop_init,
   rectangle_results <- struct_results |> tibble::enframe() |>
     tidyr::unnest_longer(value, indices_to = "anchored") |>
     tidyr::unnest_longer(value, indices_to = "model") |>
+    tidyr::unnest_longer(value, indices_to = "indicator") |>
     dplyr::rename(adjustment = name) |>
-    dplyr::mutate(
-      estimate       = sapply(value, \(x) { e <- x[["estimate"]];       if (is.null(e) || !is.numeric(e)) NA_real_      else as.numeric(e) }),
-      variance       = sapply(value, \(x) { e <- x[["variance"]];       if (is.null(e) || !is.numeric(e)) NA_real_      else as.numeric(e) }),
-      ess            = sapply(value, \(x) { e <- x[["ess"]];            if (is.null(e))                    NA_real_      else as.numeric(e) }),
-      error_estimate = sapply(value, \(x) { e <- x[["error_estimate"]]; if (is.null(e))                    NA_character_ else as.character(e) })
-    ) |>
-    dplyr::select(-value)
+    tidyr::pivot_wider(names_from = indicator, values_from = value) |>
+    dplyr::mutate(across(c(estimate, variance, ess), as.numeric))
 
   list_results <- list(rectangle_results = rectangle_results)
   if (retrieve_ps_weights) list_results$struct_ps_df <- struct_ps_df
